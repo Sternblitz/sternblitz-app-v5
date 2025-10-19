@@ -1,0 +1,35 @@
+Du arbeitest auf einem bestehenden Next.js (+ ggf. Supabase) Projekt. Überarbeite inkrementell: Auth/Login, Team-Leiter-Struktur und RBAC (Rollen: ADMIN, OWNER, TEAM_LEAD, REP). Keine heimlichen Schema-Änderungen im Code – immer via SQL-Migration unter supabase/migrations/*.sql.
+
+Lieferumfang je Änderung (ein PR):
+
+Code-Änderungen (sauber, typisiert, ohne Breaking Changes).
+
+Supabase-Migrationen (Upgrades passend zu supabase/SCHEMA.sql), inkl. RLS-Policies.
+
+README-Update: Setup, ENV, lokale Tests, Deploy-Hinweise.
+
+env.example aktualisiert.
+
+Optional: scripts/env-check.mjs, pnpm verify:deploy Pipeline.
+
+Nicht verhandelbare Leitplanken:
+
+Build muss lokal und auf Vercel laufen (Deploy-Safe).
+
+Keine nicht existierenden Paketversionen.
+
+Falls Schema unklar: sichere Defaults + im README dokumentieren.
+
+Schreib migrations vor Code, der neue Felder braucht.
+
+Definition of Done:
+
+pnpm install && pnpm build grün.
+
+Auth funktioniert.
+
+Rollen greifen (Owner/Admin org-weit; Team-Lead team-weit; Rep nur eigene Daten).
+
+README erklärt 1:1, was ich im Supabase und Vercel setzen muss.---
+alwaysApply: true
+---
