@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const supabase = supabaseServerAuth();
@@ -27,4 +29,3 @@ export async function GET() {
     return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
   }
 }
-

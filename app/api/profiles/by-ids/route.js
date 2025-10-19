@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req) {
   try {
     const supabase = supabaseServerAuth();

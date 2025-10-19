@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 const ALLOWED = new Set(["NEW", "PROCESSING", "SUCCESS", "WAITING_PAYMENT"]);
 
 function normalizeStatus(raw) {

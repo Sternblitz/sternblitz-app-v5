@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 
+export const dynamic = "force-dynamic";
+
 // helpers
 function startOfToday() { const d = new Date(); d.setHours(0,0,0,0); return d; }
 function startOfYesterday() { const d = startOfToday(); d.setDate(d.getDate()-1); return d; }

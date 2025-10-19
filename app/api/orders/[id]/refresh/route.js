@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 
+export const dynamic = "force-dynamic";
+
 const DEFAULT_REVIEW_API =
   "https://sternblitz-review-simulator-cwnz.vercel.app/api/reviews";
 

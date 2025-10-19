@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 
+export const dynamic = "force-dynamic";
+
 export async function DELETE(_req, { params }) {
   try {
     const id = params?.id;
@@ -34,4 +36,3 @@ export async function DELETE(_req, { params }) {
     return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
   }
 }
-
