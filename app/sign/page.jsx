@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
 
+export const dynamic = "force-dynamic";
+
 export default function SignPage() {
   // ===== Canvas (Signatur) =====
   const canvasRef = useRef(null);

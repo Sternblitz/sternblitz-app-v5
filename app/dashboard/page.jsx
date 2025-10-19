@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import LiveSimulator from "../../components/LiveSimulator";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardPage() {
   const router = useRouter();
 
