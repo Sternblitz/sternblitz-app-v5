@@ -110,6 +110,8 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Keine Namensabfrage – Begrüßung bleibt schlicht „Hallo 👋“
+
   // EIN Button -> frische Daten ziehen, Rakete kurz "fliegen", Formular öffnen
   const openFormWithBlast = () => {
     pullLatest();
@@ -192,35 +194,64 @@ export default function DashboardPage() {
 
   return (
     <main className="shell">
-      {/* Fixed Header mit Logo */}
-      <header className="sb-header" role="banner" aria-label="Sternblitz">
-        <div className="sb-header-inner">
-          <img
-            className="sb-logo"
-            src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/68ad4679902a5d278c4cf0bc_Group%202085662922-p-500.png"
-            alt="Sternblitz"
-          />
+      {/* Hero-Bereich über dem Simulator */}
+      <section className="hero">
+        <div className="hero-inner">
+          <div className="hero-copy">
+            <h1 className="headline">Hallo 👋</h1>
+          </div>
         </div>
-      </header>
+      </section>
 
-      {/* Platzhalter unter dem fixen Header */}
-      <div className="sb-header-spacer" />
+      {/* 3 Schritte */}
+      <section className="steps" aria-label="Ablauf in drei Schritten">
+        <ol className="steps-row">
+          <li className="step-card">
+            <div className="badge">1</div>
+            <div className="emoji" aria-hidden>🏢</div>
+            <div className="step-title">Unternehmen wählen</div>
+          </li>
+          <li className="arrow" aria-hidden>→</li>
+          <li className="step-card">
+            <div className="badge">2</div>
+            <div className="emoji" aria-hidden>⭐</div>
+            <div className="step-title">Bewertungen auswählen</div>
+          </li>
+          <li className="arrow" aria-hidden>→</li>
+          <li className="step-card">
+            <div className="badge">3</div>
+            <div className="emoji" aria-hidden>🛋️</div>
+            <div className="step-title">Zurücklehnen</div>
+          </li>
+        </ol>
+      </section>
 
-      {/* Live-Simulator */}
+      {/* Live-Simulator – unverändert */}
       <LiveSimulator />
 
-      {/* EIN Button (schwarz, mit 🚀) */}
+      {/* CTA unten, elegant eingebunden */}
       {!formOpen && (
-        <div className="cta">
-          <button
-            className={`primary-btn ${blast ? "blast" : ""}`}
-            onClick={openFormWithBlast}
-          >
-            <span className="label">Jetzt loslegen</span>
-            <span className="rocket" aria-hidden>🚀</span>
-          </button>
-        </div>
+        <section className="bottom-cta" aria-label="Weiter zum Formular">
+          <div className="cta-card">
+            <button
+              className={`primary-btn ${blast ? "blast" : ""}`}
+              onClick={openFormWithBlast}
+            >
+              <span className="label">Jetzt loslegen</span>
+              <span className="rocket" aria-hidden>🚀</span>
+            </button>
+          </div>
+        </section>
       )}
+
+      {/* Trust-Leiste */}
+      <section className="trust" aria-label="Vertrauen & Sicherheit">
+        <ul className="trust-list">
+          <li className="trust-item">🔒 DSGVO‑konform</li>
+          <li className="trust-item">🛡️ 0% Risiko</li>
+          <li className="trust-item">⚖️ 100% legal</li>
+        </ul>
+      </section>
 
       {/* Formular-Card */}
       <section
@@ -434,7 +465,7 @@ export default function DashboardPage() {
           --blue:#0b6cf2;
         }
 
-        /* ————— 1) KRÄFTIGER, SAUBERER HINTERGRUND-GRADIENT ————— */
+        /* ————— 1) HINTERGRUND (sehr dezentes Blau) ————— */
         .shell{
           min-height:100dvh;
           padding:0 14px 80px;
@@ -448,61 +479,44 @@ export default function DashboardPage() {
           inset:0;
           z-index:-1;
           pointer-events:none;
-          /* Intensiver, aber clean: Grün (d8e7db) + kräftigeres Blau, mit Depth */
           background:
-            radial-gradient(1100px 560px at 12% -10%, rgba(216,231,219,0.95) 0%, rgba(216,231,219,0.25) 55%, rgba(216,231,219,0) 70%),
-            radial-gradient(1200px 620px at 100% -10%, rgba(55,130,255,0.45) 0%, rgba(55,130,255,0.12) 60%, rgba(55,130,255,0) 75%),
-            linear-gradient(180deg, #f1f7ff 0%, #ffffff 45%, #ffffff 100%);
+            radial-gradient(900px 480px at 20% -10%, rgba(11,108,242,0.10) 0%, rgba(11,108,242,0.06) 30%, rgba(11,108,242,0.0) 60%),
+            linear-gradient(180deg, #f8fbff 0%, #ffffff 55%, #ffffff 100%);
         }
 
-        /* ————— 2) FIXER HEADER MIT LOGO ————— */
-        .sb-header{
-          position: sticky; /* sticky wirkt angenehm beim Scrollen */
-          top: 0;
-          z-index: 10;
-          backdrop-filter: saturate(1.1) blur(6px);
-        }
-        .sb-header-inner{
-          max-width:1208px;
-          margin:0 auto;
-          padding:14px 8px 10px;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-        }
-        .sb-logo{
-          height:54px;
-          width:auto;
-          object-fit:contain;
-          filter: drop-shadow(0 4px 10px rgba(0,0,0,.10));
-        }
-        /* Spacer, damit der Simulator nicht am Header klebt */
-        .sb-header-spacer{ height: 10px; }
+        /* ————— 2) HERO ————— */
+        .hero { padding: 6px 0 2px; }
+        .hero-inner{ max-width:1208px; margin:0 auto; padding: 0 4px; }
+        .hero-copy{ max-width: 860px; }
+        .headline{ margin:0; font-size: 40px; line-height:1.1; letter-spacing:-.3px }
 
-        /* ————— 3) SIMULATOR: bleibt unverändert, liegt auf weißer Card ————— */
-        .review-container{
-          position: relative;
-          border-radius: 16px;
-          background-color: #fff;      /* weißer Kasten hinter dem Suchfeld */
-          box-shadow: 0 24px 60px rgba(2,6,23,.10);
+        /* ————— 3) SCHRITTE ————— */
+        .steps{ padding: 4px 0 6px; }
+        .steps-row{ max-width:1208px; margin:0 auto; padding: 4px; list-style:none; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap }
+        .step-card{
+          position:relative; overflow:hidden; border-radius:11px; padding:8px 10px;
+          background: linear-gradient(180deg, rgba(248,250,253,.78) 0%, rgba(248,250,253,.9) 100%);
+          border:1px solid rgba(15,23,42,.05);
+          box-shadow:0 4px 12px rgba(2,6,23,.04);
+          display:flex; align-items:center; gap:10px; min-height:44px; flex:0 0 220px;
         }
-
-        .sb-wrap{max-width:1208px;margin:0 auto;}
+        .badge{ flex:none; width:22px; height:22px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#0b6cf2; background:#eef4ff; border:1px solid #dbeafe; font-size:11.5px }
+        .emoji{ font-size:16px; line-height:1; }
+        .step-title{ font-weight:700; font-size:13.8px; letter-spacing:.2px }
+        .arrow{ color: rgba(100,116,139,.32); font-size:16px; padding:0 2px; display:flex; align-items:center; justify-content:center; flex:0 0 16px }
 
         /* CTA */
-        .cta{display:flex;justify-content:center;margin-top:18px}
-        .primary-btn{
-          appearance:none;border:1px solid #0b0b0b;background:#0b0b0b;color:#fff;
-          padding:16px 28px;border-radius:18px;font-weight:800;letter-spacing:.2px;font-size:17px;
-          box-shadow:0 10px 26px rgba(0,0,0,.2);
-          transition:transform .12s, box-shadow .2s, background .2s;
-          display:inline-flex;gap:10px;align-items:center;position:relative;overflow:hidden;
-          animation:pulseBtn 2.2s ease-in-out infinite;
-        }
-        .primary-btn:hover{transform:translateY(-1px);background:#111;box-shadow:0 14px 32px rgba(0,0,0,.28)}
+        .bottom-cta{ padding: 14px 0 6px; }
+        .cta-card{ max-width: 1208px; margin: 0 auto; padding: 14px; display:flex; justify-content:center }
+        .primary-btn{ appearance:none;border:1px solid rgba(11,108,242,.28); background:linear-gradient(135deg,#0b6cf2 0%,#3b82f6 100%); color:#fff; padding:14px 22px;border-radius:14px;font-weight:800;letter-spacing:.2px;font-size:16px; box-shadow:0 12px 28px rgba(11,108,242,.28); transition:transform .12s, box-shadow .2s, filter .2s; display:inline-flex;gap:10px;align-items:center;position:relative;overflow:hidden }
+        .primary-btn:hover{ transform:translateY(-1px); filter:brightness(1.05); box-shadow:0 18px 36px rgba(11,108,242,.35) }
         .rocket{display:inline-block;transition:transform .25s ease}
         .primary-btn.blast .rocket{transform:translateY(-18px) translateX(6px) rotate(-12deg) scale(1.08)}
-        @keyframes pulseBtn{0%{transform:scale(.995)}50%{transform:scale(1)}100%{transform:scale(.995)}}
+
+        /* Trust-Bar */
+        .trust{ padding: 2px 0 0 }
+        .trust-list{ list-style:none; display:flex; gap:14px; align-items:center; justify-content:center; margin: 8px auto 0; padding: 0 14px 0; max-width: 980px; flex-wrap: wrap }
+        .trust-item{ background:#fff; border:1px solid rgba(15,23,42,.08); box-shadow:0 6px 18px rgba(2,6,23,.05); padding:8px 12px; border-radius:999px; font-weight:800; font-size:13.5px }
 
         /* Drawer-Card */
         .drawer{
@@ -583,6 +597,26 @@ export default function DashboardPage() {
         .submit-btn.next .label{font-size:16px}
 
         /* Mobile */
+        /* Tablet */
+        @media (max-width:1024px){
+          .steps-row{ gap:10px }
+          .step-card{ flex:1 1 200px; min-height:42px; padding:8px 10px }
+          .badge{ width:20px; height:20px; font-size:11px }
+          .emoji{ font-size:15px }
+          .step-title{ font-size:13.5px }
+          .arrow{ font-size:15px; flex-basis:16px }
+        }
+
+        /* Mobile */
+        @media (max-width:640px){
+          .steps-row{ flex-direction:column; align-items:center; gap:8px; max-width:560px }
+          .step-card{ width:100%; max-width:360px; flex:0 0 auto; min-height:42px; padding:8px 10px; background: linear-gradient(180deg, rgba(248,250,253,.74) 0%, rgba(248,250,253,.86) 100%) }
+          .badge{ width:20px; height:20px }
+          .emoji{ font-size:15px }
+          .step-title{ font-size:13.2px }
+          .arrow{ transform: rotate(90deg); margin: -3px 0; font-size:14px; flex: none; width:16px; height:16px; color: rgba(100,116,139,.3) }
+        }
+
         @media (max-width:820px){
           .drawer{margin:16px 0 0;border-radius:16px}
           .checks{grid-template-columns:1fr}
@@ -590,7 +624,8 @@ export default function DashboardPage() {
           .actions{justify-content:stretch}
           .actions.center{justify-content:center}
           .submit-btn.next{width:100%;justify-content:center}
-          .sb-header-spacer{ height: 8px; }
+          .headline{ font-size: 32px; }
+          .steps-row{ justify-content: center }
         }
       `}</style>
     </main>

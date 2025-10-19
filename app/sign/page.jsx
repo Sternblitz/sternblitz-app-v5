@@ -383,7 +383,7 @@ export default function SignPage() {
                     setEditProfile(false);
                   }}
                 >
-                  Übernehmen
+                  Speichern
                 </button>
               </div>
             </div>
@@ -541,14 +541,19 @@ export default function SignPage() {
           --yellow:#FBBC05;
           --card:#ffffff;
         }
+        /* Vollflächiger Hintergrund mit dem farbigen Verlauf (wie zuvor), auch unter der TopBar */
         .shell{
           min-height:100dvh;
+          padding:14px 14px 68px; /* TopNav fügt bereits 72px Spacer ein */
+          display:flex;flex-direction:column;gap:16px;align-items:center;
+          position:relative; z-index:0; background:transparent;
+        }
+        .shell::before{
+          content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
           background:
             radial-gradient(1200px 600px at 12% 0%, rgba(216,231,219,.95) 0%, rgba(216,231,219,.12) 60%),
             radial-gradient(1400px 700px at 100% 0%, rgba(52,140,255,.42) 0%, rgba(52,140,255,0) 65%),
             linear-gradient(180deg, #f3f9ff 0%, #ffffff 60%, #ffffff 100%);
-          padding:44px 14px 68px;
-          display:flex;flex-direction:column;gap:16px;align-items:center;
         }
         .card{
           width:100%;
@@ -590,7 +595,7 @@ export default function SignPage() {
         .with-bar.blue .bar{background:linear-gradient(90deg, rgba(11,108,242,.18), rgba(11,108,242,.08));}
         .with-bar.green .bar{background:linear-gradient(90deg, rgba(34,197,94,.22), rgba(34,197,94,.10));}
         .with-bar.yellow .bar{background:linear-gradient(90deg, rgba(251,188,5,.25), rgba(251,188,5,.10));}
-        .with-bar .content{padding:12px 14px}
+        .with-bar .content{padding:12px 14px 14px}
         .with-bar .value{font-weight:900;color:#0a0a0a}
         .with-bar .count{margin-left:8px;color:var(--blue);font-weight:900}
         .icon-btn{
@@ -602,8 +607,14 @@ export default function SignPage() {
         .text{
           width:100%;height:36px;border-radius:10px;border:1px solid rgba(0,0,0,.12);padding:6px 10px;
         }
-        .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
-        .btn{border-radius:10px;height:34px;padding:0 12px;font-weight:900;letter-spacing:.2px;cursor:pointer}
+        /* Edit-Aktionsleiste mittig, nicht am Eck */
+        .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid rgba(15,23,42,.06);width:100%}
+        .row-actions .btn{min-width:110px}
+        .btn{border-radius:10px;height:32px;padding:0 12px;font-weight:900;letter-spacing:.2px;cursor:pointer}
+        .btn.ghost{border:1px solid #cbd5e1;background:#fff;color:#111;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+        .btn.ghost:hover{background:#f8fafc}
+        .btn.solid{border:1px solid #0b6cf2;background:#0b6cf2;color:#fff}
+        
         .btn.ghost{border:1px solid var(--line);background:#fff}
         .btn.solid{border:1px solid #0b6cf2;background:#0b6cf2;color:#fff}
         .btn.full{width:100%;justify-content:center}
@@ -655,11 +666,16 @@ export default function SignPage() {
           .pad{max-width:100%}
         }
         @media (max-width:560px){
-          .card{max-width:92vw}
-          .lead{max-width:92vw}
+          .card{max-width:100%}
+          .lead{max-width:100%}
           .contact-grid{grid-template-columns:1fr}
           .contact-grid.readonly{grid-template-columns:1fr}
+          .row-actions{gap:8px}
         }
+
+        /* Die Hero-Card hält immer einen Seitenabstand auf Mobile/kleineren Displays */
+        /* Hero-Card zentriert; Seitenabstand kommt von .shell padding */
+        .card-hero{ margin-left:auto; margin-right:auto }
         .actions {
           display: flex;
           justify-content: center;
