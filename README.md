@@ -19,13 +19,14 @@ npm install
 ### 3. Supabase vorbereiten
 1. Supabase-Projekt erstellen oder vorhandenes Projekt verwenden.
 2. Migrationen anwenden:
-   - Datei: `supabase/migrations/20251019160509_orders_rbac.sql`
-   - Enthält Tabellen (`organizations`, `teams`, `profiles`, `orders`), Trigger-Funktionen und sämtliche RLS-Policies.
+   - `supabase/migrations/20251019160509_orders_rbac.sql` (Tabellen, RLS, Trigger)
+   - `supabase/migrations/20251019185009_orders_status_metrics.sql` (Baseline-/Live-Metriken, Update-Policy)
    - Ausführung via Supabase CLI:
      ```bash
      npx supabase db push --file supabase/migrations/20251019160509_orders_rbac.sql
+     npx supabase db push --file supabase/migrations/20251019185009_orders_status_metrics.sql
      ```
-     oder die SQL-Datei direkt über das Supabase Dashboard laufen lassen.
+     oder die SQL-Dateien direkt über das Supabase Dashboard laufen lassen.
 3. Bestehende Nutzer (`auth.users`) per `profiles`-Eintrag einer Organisation/Team und Rolle zuordnen:
    ```sql
    insert into public.organizations (id, name) values ('<org-id>', 'Sternblitz') on conflict (id) do nothing;
@@ -60,6 +61,9 @@ Siehe Snapshot `supabase/SCHEMA.sql`. Kernpunkte:
 - `teams`: gehören zu einer Organisation, optional mit `leader_id`.
 - `profiles`: 1:1 zu `auth.users`, enthält `role`, `org_id`, `team_id`.
 - `orders`: Aufträge/Leads inkl. PDF-Storage-Pfad, Counts, Rep-Code etc.
+  - Baseline: `start_total_reviews`, `start_average_rating`, `start_bad_1..3`
+  - Live: `live_total_reviews`, `live_average_rating`, `live_bad_1..3`, `last_refreshed_at`
+  - Kontext für Updates: `review_name`, `review_address`
 - RLS via `public.can_access_order(org_id, team_id, created_by)`:
   - ADMIN: volle Organisation.
   - TEAM_LEADER: eigenes Team + eigene Aufträge.
@@ -84,6 +88,12 @@ Siehe Snapshot `supabase/SCHEMA.sql`. Kernpunkte:
    ```
    Verifizieren, dass `created_by` und `team_id` den erwarteten Zuordnungen entsprechen.
 
+## Auftragsstatus & Refresh
+- Beim Anlegen eines Auftrags werden die Google-Bewertungsdaten als Baseline gespeichert (`start_*` Felder). Live-Werte spiegeln den zuletzt gemessenen Stand wider.
+- Die 🔄-Schaltfläche in `/dashboard/orders` ruft `POST /api/orders/{id}/refresh` auf und nutzt `REVIEW_API` (oder den eingebauten Simulator) für aktuelle Zahlen. Nach dem Update wird `last_refreshed_at` gesetzt und der Fortschritt neu berechnet.
+- Supabase Storage: Der Bucket `contracts` muss existieren (öffentlich ausreichend), damit PDFs abgelegt werden können.
+- Für verlässliche Live-Daten `REVIEW_API` in `.env`/Vercel konfigurieren; ohne Key greift der Simulator-Fallback.
+
 ## Fehlerbehebung & Tipps
 - **Kein Profil gefunden:** Der API-Handler liefert 403, wenn kein Eintrag in `public.profiles` existiert – Profil ergänzen und erneut versuchen.
 - **Supabase Storage Berechtigungen:** Uploads nutzen den Service-Role-Key (`SUPABASE_SERVICE_ROLE_KEY`). Bucket `contracts` muss existieren und öffentlich sein, wenn auf `pdf_signed_url` direkt zugegriffen werden soll.
@@ -92,3 +102,4 @@ Siehe Snapshot `supabase/SCHEMA.sql`. Kernpunkte:
 ## Build Verification
 - `npm run build`
 - Test-Auftrag erstellen und sicherstellen, dass der neue Datensatz gemäß Rolle sichtbar ist (siehe Checkliste).
+- In `/dashboard/orders` den 🔄 Refresh auslösen und prüfen, dass Live-Werte, Fortschritt und Zeitstempel aktualisiert werden.

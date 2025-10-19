@@ -87,6 +87,7 @@ export default function LiveSimulator() {
           "sb_stats",
           JSON.stringify({
             totalReviews: nextData.totalReviews,
+            averageRating: nextData.averageRating,
             breakdown: nextData.breakdown,
           })
         );
@@ -96,6 +97,7 @@ export default function LiveSimulator() {
           new CustomEvent("sb:stats", {
             detail: {
               totalReviews: nextData.totalReviews,
+              averageRating: nextData.averageRating,
               breakdown: nextData.breakdown,
             },
           })

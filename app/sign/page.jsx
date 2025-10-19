@@ -15,6 +15,7 @@ export default function SignPage() {
     googleUrl: "",
     selectedOption: "",
     counts: { c123: null, c12: null, c1: null },
+    stats: { totalReviews: null, averageRating: null, breakdown: null },
     company: "",
     firstName: "",
     lastName: "",
@@ -39,6 +40,7 @@ export default function SignPage() {
     email: "",
     phone: "",
   });
+  const [profileSource, setProfileSource] = useState({ name: "", address: "" });
 
   // ===== Helpers =====
   const optionLabel = (opt) =>
@@ -64,6 +66,7 @@ export default function SignPage() {
         googleUrl: p?.googleUrl || "",
         selectedOption: p?.selectedOption || "",
         counts,
+        stats: p?.stats || { totalReviews: null, averageRating: null, breakdown: null },
         company: p?.company || "",
         firstName: p?.firstName || "",
         lastName: p?.lastName || "",
@@ -78,6 +81,13 @@ export default function SignPage() {
         email: p?.email || "",
         phone: p?.phone || "",
       });
+      try {
+        const src = JSON.parse(sessionStorage.getItem("sb_selected_profile") || "{}");
+        setProfileSource({
+          name: src?.name || "",
+          address: src?.address || "",
+        });
+      } catch {}
     } catch {}
   }, []);
 
@@ -116,6 +126,7 @@ export default function SignPage() {
         const fresh = [name, address].filter(Boolean).join(", ");
         setGoogleField(fresh);
         setSummary((s) => ({ ...s, googleProfile: fresh, googleUrl: url || "" }));
+        setProfileSource({ name, address });
         try {
           const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
           const payload = JSON.parse(raw);
@@ -245,6 +256,8 @@ export default function SignPage() {
           phone: summary.phone,
           signaturePng,
           counts: summary.counts,        // 1–3 / 1–2 / 1 Stückzahl
+          stats: summary.stats,
+          statsSource: profileSource,
           rep_code: repCode,             // neu
           source_account_id: sourceAccountId, // neu
         }),
@@ -352,6 +365,13 @@ export default function SignPage() {
                   className="btn solid"
                   onClick={() => {
                     setSummary((s) => ({ ...s, googleProfile: googleField }));
+                    const parts = (googleField || "").split(",");
+                    const manualName = (parts.shift() || "").trim();
+                    const manualAddress = parts.join(",").trim();
+                    setProfileSource({
+                      name: manualName,
+                      address: manualAddress,
+                    });
                     try {
                       const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
                       const payload = JSON.parse(raw);

@@ -19,6 +19,11 @@ export default function DashboardPage() {
 
   // Stats für Labels (vom Simulator)
   const [counts, setCounts] = useState({ c123: null, c12: null, c1: null });
+  const [stats, setStats] = useState({
+    totalReviews: null,
+    averageRating: null,
+    breakdown: null,
+  });
 
   // Kontaktdaten
   const [company, setCompany] = useState("");
@@ -52,7 +57,15 @@ export default function DashboardPage() {
         setGoogleUrl(p?.url || "");
       }
       const statsRaw = sessionStorage.getItem("sb_stats");
-      if (statsRaw) setCounts(computeCounts(JSON.parse(statsRaw)));
+      if (statsRaw) {
+        const parsed = JSON.parse(statsRaw);
+        setStats({
+          totalReviews: Number(parsed?.totalReviews ?? null),
+          averageRating: typeof parsed?.averageRating === "number" ? parsed.averageRating : null,
+          breakdown: parsed?.breakdown || null,
+        });
+        setCounts(computeCounts(parsed));
+      }
       const opt = sessionStorage.getItem("sb_selected_option");
       if (opt) setOption(opt);
     } catch {}
@@ -71,6 +84,12 @@ export default function DashboardPage() {
     };
     const onStats = (e) => {
       setCounts(computeCounts(e.detail));
+      setStats({
+        totalReviews: Number(e.detail?.totalReviews ?? null),
+        averageRating:
+          typeof e.detail?.averageRating === "number" ? e.detail.averageRating : null,
+        breakdown: e.detail?.breakdown || null,
+      });
       try {
         sessionStorage.setItem("sb_stats", JSON.stringify(e.detail));
       } catch {}
@@ -154,6 +173,13 @@ export default function DashboardPage() {
       email,
       phone,
       counts, // für Prefill der /sign Seite
+      stats: stats?.breakdown
+        ? {
+            totalReviews: stats.totalReviews,
+            averageRating: stats.averageRating,
+            breakdown: stats.breakdown,
+          }
+        : null,
       submittedAt: new Date().toISOString(),
     };
     try {

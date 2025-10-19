@@ -59,6 +59,20 @@ create table public.orders (
   signature_png_path text,
   pdf_path text,
   pdf_signed_url text
+  ,
+  start_total_reviews integer,
+  start_average_rating numeric,
+  start_bad_1 integer,
+  start_bad_2 integer,
+  start_bad_3 integer,
+  live_total_reviews integer,
+  live_average_rating numeric,
+  live_bad_1 integer,
+  live_bad_2 integer,
+  live_bad_3 integer,
+  last_refreshed_at timestamptz,
+  review_name text,
+  review_address text
 );
 create index orders_created_at_idx on public.orders(created_at desc);
 create index orders_org_id_idx on public.orders(org_id);
@@ -72,4 +86,4 @@ create index orders_created_by_idx on public.orders(created_by);
 
 -- RLS POLICIES --------------------------------------------------------------
 -- profiles: self-manage (select/update/insert own row)
--- orders: uses public.can_access_order(org_id, team_id, created_by)
+-- orders: uses public.can_access_order(org_id, team_id, created_by) for select/insert/update

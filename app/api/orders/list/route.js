@@ -69,12 +69,27 @@ export async function GET(req) {
         phone,
         selected_option,
         counts,
+        sales_notes,
+        backoffice_notes,
         pdf_path,
         pdf_signed_url,
         rep_code,
         option_chosen_count,
         status,
-        custom_notes
+        custom_notes,
+        start_total_reviews,
+        start_average_rating,
+        start_bad_1,
+        start_bad_2,
+        start_bad_3,
+        live_total_reviews,
+        live_average_rating,
+        live_bad_1,
+        live_bad_2,
+        live_bad_3,
+        last_refreshed_at,
+        review_name,
+        review_address
       `)
       .order("created_at", { ascending: false })
       .limit(200);

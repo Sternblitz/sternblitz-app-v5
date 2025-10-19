@@ -81,6 +81,28 @@ function cleanString(value) {
   return trimmed.length ? trimmed : null;
 }
 
+function normalizeBreakdown(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const normalized = {};
+  [1, 2, 3, 4, 5].forEach((star) => {
+    const val = Number(raw[star]);
+    if (Number.isFinite(val)) normalized[star] = val;
+  });
+  return normalized;
+}
+
+function sanitizeStats(stats) {
+  if (!stats || typeof stats !== "object") return null;
+  const total = Number(stats.totalReviews);
+  const average = Number(stats.averageRating);
+  const breakdown = normalizeBreakdown(stats.breakdown);
+  return {
+    totalReviews: Number.isFinite(total) ? total : null,
+    averageRating: Number.isFinite(average) ? average : null,
+    breakdown,
+  };
+}
+
 // ---------- PDF ----------
 async function buildPdf(p, sigBytes) {
   const pdf = await PDFDocument.create();
@@ -173,6 +195,8 @@ export async function POST(req) {
       phone,
       signaturePng,
       counts,                 // { c123, c12, c1 }
+      stats,
+      statsSource,
       rep_code = null,        // neu: wird mitgespeichert
       source_account_id = null, // neu: wird mitgespeichert
     } = body || {};
@@ -180,6 +204,31 @@ export async function POST(req) {
     const normalizedGoogleProfile =
       typeof googleProfile === "string" ? googleProfile.trim() : googleProfile;
     const normalizedGoogleUrl = cleanString(googleUrl);
+    const statsSnapshot = sanitizeStats(stats);
+    const breakdown = statsSnapshot?.breakdown || {};
+    const startBad1 = Number.isFinite(breakdown[1]) ? breakdown[1] : null;
+    const startBad2 = Number.isFinite(breakdown[2]) ? breakdown[2] : null;
+    const startBad3 = Number.isFinite(breakdown[3]) ? breakdown[3] : null;
+    const startBadValues = [startBad1, startBad2, startBad3].filter((value) =>
+      Number.isFinite(value)
+    );
+    const startBadSum = startBadValues.length
+      ? startBadValues.reduce((sum, value) => sum + value, 0)
+      : null;
+    const startTotalReviews =
+      statsSnapshot && Number.isFinite(statsSnapshot.totalReviews)
+        ? statsSnapshot.totalReviews
+        : null;
+    const startAverageRating =
+      statsSnapshot && Number.isFinite(statsSnapshot.averageRating)
+        ? statsSnapshot.averageRating
+        : null;
+    const liveTotalReviews = startTotalReviews;
+    const liveAverageRating = startAverageRating;
+    const liveBad1 = startBad1;
+    const liveBad2 = startBad2;
+    const liveBad3 = startBad3;
+    const nowIso = new Date().toISOString();
 
     if (!normalizedGoogleProfile || !signaturePng) {
       return NextResponse.json({ error: "Ungültige Daten" }, { status: 400 });
@@ -256,7 +305,29 @@ export async function POST(req) {
 
     // 3) Auftrag speichert sich über das RLS-fähige Client
     const picked = chosenCount(selectedOption, counts);
-    const sanitizedCounts = sanitizeCounts(counts);
+    let sanitizedCounts = sanitizeCounts(counts) || {};
+    const countsFromBreakdown = {};
+    if (Number.isFinite(startBad1)) countsFromBreakdown.c1 = startBad1;
+    if (Number.isFinite(startBad1) || Number.isFinite(startBad2)) {
+      const sum = (Number.isFinite(startBad1) ? startBad1 : 0) + (Number.isFinite(startBad2) ? startBad2 : 0);
+      countsFromBreakdown.c12 = sum;
+    }
+    if (Number.isFinite(startBadSum)) countsFromBreakdown.c123 = startBadSum;
+    sanitizedCounts = { ...sanitizedCounts, ...countsFromBreakdown };
+    if (!Object.keys(sanitizedCounts).length) sanitizedCounts = null;
+
+    const sourceName = statsSource && typeof statsSource === "object" ? cleanString(statsSource.name) : null;
+    const sourceAddress = statsSource && typeof statsSource === "object" ? cleanString(statsSource.address) : null;
+    let fallbackName = null;
+    let fallbackAddress = null;
+    if (typeof normalizedGoogleProfile === "string") {
+      const parts = normalizedGoogleProfile.split(",");
+      fallbackName = cleanString(parts.shift() || "");
+      fallbackAddress = cleanString(parts.join(","));
+    }
+    const reviewName = sourceName || fallbackName;
+    const reviewAddress = sourceAddress || fallbackAddress;
+
     const orderPayload = {
       google_profile: normalizedGoogleProfile,
       google_url: normalizedGoogleUrl,
@@ -269,6 +340,27 @@ export async function POST(req) {
       phone: cleanString(phone),
       pdf_path: key,
       pdf_signed_url: pdfUrl,
+      start_total_reviews: Number.isFinite(startTotalReviews)
+        ? Math.round(startTotalReviews)
+        : null,
+      start_average_rating: Number.isFinite(startAverageRating)
+        ? Number(startAverageRating.toFixed(2))
+        : null,
+      start_bad_1: Number.isFinite(startBad1) ? Math.round(startBad1) : null,
+      start_bad_2: Number.isFinite(startBad2) ? Math.round(startBad2) : null,
+      start_bad_3: Number.isFinite(startBad3) ? Math.round(startBad3) : null,
+      live_total_reviews: Number.isFinite(liveTotalReviews)
+        ? Math.round(liveTotalReviews)
+        : null,
+      live_average_rating: Number.isFinite(liveAverageRating)
+        ? Number(liveAverageRating.toFixed(2))
+        : null,
+      live_bad_1: Number.isFinite(liveBad1) ? Math.round(liveBad1) : null,
+      live_bad_2: Number.isFinite(liveBad2) ? Math.round(liveBad2) : null,
+      live_bad_3: Number.isFinite(liveBad3) ? Math.round(liveBad3) : null,
+      last_refreshed_at: nowIso,
+      review_name: reviewName,
+      review_address: reviewAddress,
     };
 
     if (rep_code && typeof rep_code === "string") {
