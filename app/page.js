@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
+
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  if (typeof window !== "undefined") window.location.href = "/login";
-  return null;
+  // Serverseitige Weiterleitung verhindert leere SSR-Ausgabe/404
+  redirect("/login");
 }
