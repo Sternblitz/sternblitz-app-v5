@@ -1,8 +1,8 @@
 {
   "/login/page": "app/login/page.js",
   "/api/me/route": "app/api/me/route.js",
-  "/api/teams/list/route": "app/api/teams/list/route.js",
   "/api/orders/list/route": "app/api/orders/list/route.js",
+  "/api/teams/list/route": "app/api/teams/list/route.js",
   "/api/profiles/by-ids/route": "app/api/profiles/by-ids/route.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/dashboard/orders/page": "app/dashboard/orders/page.js"
