@@ -93,22 +93,30 @@ export default function SignPage() {
     } catch {}
   }, []);
 
-  // ===== Canvas Setup =====
+  // ===== Canvas Setup (responsive, präzise auf Touch) =====
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    const cssW = 760; // etwas schmaler
-    const cssH = 260;
-    c.style.width = cssW + "px";
-    c.style.height = cssH + "px";
-    c.width = cssW * ratio;
-    c.height = cssH * ratio;
-    const ctx = c.getContext("2d");
-    ctx.scale(ratio, ratio);
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = "#0f172a";
+
+    const setup = () => {
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const rect = c.getBoundingClientRect();
+      const cssW = Math.max(1, Math.floor(rect.width));
+      const cssH = Math.max(1, Math.floor(rect.height));
+      c.width = cssW * ratio;
+      c.height = cssH * ratio;
+      const ctx = c.getContext("2d");
+      // Reset Transform, dann sauber skalieren
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(ratio, ratio);
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#0f172a";
+    };
+
+    setup();
+    window.addEventListener("resize", setup);
+    return () => window.removeEventListener("resize", setup);
   }, []);
 
   // ===== Google Places (Profil-Edit) =====
@@ -541,23 +549,24 @@ export default function SignPage() {
           --yellow:#FBBC05;
           --card:#ffffff;
         }
-        /* Vollflächiger Hintergrund mit dem farbigen Verlauf (wie zuvor), auch unter der TopBar */
+        /* Vollflächiger Hintergrund (wie Dashboard, dezenter Blau-Verlauf), auch unter der TopBar */
         .shell{
           min-height:100dvh;
           padding:14px 14px 68px; /* TopNav fügt bereits 72px Spacer ein */
-          display:flex;flex-direction:column;gap:16px;align-items:center;
+          display:flex;flex-direction:column;gap:16px;align-items:stretch;
           position:relative; z-index:0; background:transparent;
+          overflow-x:hidden;
         }
         .shell::before{
           content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
           background:
-            radial-gradient(1200px 600px at 12% 0%, rgba(216,231,219,.95) 0%, rgba(216,231,219,.12) 60%),
-            radial-gradient(1400px 700px at 100% 0%, rgba(52,140,255,.42) 0%, rgba(52,140,255,0) 65%),
-            linear-gradient(180deg, #f3f9ff 0%, #ffffff 60%, #ffffff 100%);
+            radial-gradient(900px 480px at 20% -10%, rgba(11,108,242,0.10) 0%, rgba(11,108,242,0.06) 30%, rgba(11,108,242,0.0) 60%),
+            linear-gradient(180deg, #f8fbff 0%, #ffffff 55%, #ffffff 100%);
         }
         .card{
           width:100%;
           max-width:880px;
+          margin-left:auto; margin-right:auto; /* echte Zentrierung */
           background:var(--card);
           border:1px solid rgba(15,23,42,.08);
           border-radius:20px;
@@ -567,11 +576,13 @@ export default function SignPage() {
         .card-hero{
           text-align:left;
           padding:22px 22px 16px;
+          margin-top:20px; /* identisch zum Dashboard-Hero-Abstand */
+          margin-left:auto; margin-right:auto; /* absolute Zentrierung */
           background: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,.88) 58%, #ffffff 100%);
           box-shadow: var(--shadow);
         }
         .hero-head{display:flex;justify-content:center}
-        .logo{height:64px;width:auto;object-fit:contain;filter: drop-shadow(0 4px 10px rgba(0,0,0,.10))}
+        .logo{height:64px;width:auto;max-width:100%;object-fit:contain;filter: drop-shadow(0 4px 10px rgba(0,0,0,.10))}
         h1{margin:8px 0 6px;font-size:26px;color:#000;font-weight:900;text-align:center}
         .lead{margin:0 auto 12px;max-width:760px;color:var(--muted);text-align:center}
         .bullets{
@@ -596,7 +607,7 @@ export default function SignPage() {
         .with-bar.green .bar{background:linear-gradient(90deg, rgba(34,197,94,.22), rgba(34,197,94,.10));}
         .with-bar.yellow .bar{background:linear-gradient(90deg, rgba(251,188,5,.25), rgba(251,188,5,.10));}
         .with-bar .content{padding:12px 14px 14px}
-        .with-bar .value{font-weight:900;color:#0a0a0a}
+        .with-bar .value{font-weight:900;color:#0a0a0a; overflow-wrap: anywhere;}
         .with-bar .count{margin-left:8px;color:var(--blue);font-weight:900}
         .icon-btn{
           border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:10px;min-width:30px;height:30px;
@@ -607,10 +618,10 @@ export default function SignPage() {
         .text{
           width:100%;height:36px;border-radius:10px;border:1px solid rgba(0,0,0,.12);padding:6px 10px;
         }
-        /* Edit-Aktionsleiste mittig, nicht am Eck */
-        .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;padding-top:10px;border-top:1px solid rgba(15,23,42,.06);width:100%}
+        /* Edit-Aktionsleiste unten rechts, mit Luft und klarer Optik */
+        .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;padding:10px 14px 14px;border-top:1px solid rgba(15,23,42,.06);width:100%}
         .row-actions .btn{min-width:110px}
-        .btn{border-radius:10px;height:32px;padding:0 12px;font-weight:900;letter-spacing:.2px;cursor:pointer}
+        .btn{border-radius:10px;height:30px;padding:0 12px;font-weight:900;letter-spacing:.2px;cursor:pointer}
         .btn.ghost{border:1px solid #cbd5e1;background:#fff;color:#111;box-shadow:0 2px 8px rgba(0,0,0,.04)}
         .btn.ghost:hover{background:#f8fafc}
         .btn.solid{border:1px solid #0b6cf2;background:#0b6cf2;color:#fff}
@@ -666,11 +677,11 @@ export default function SignPage() {
           .pad{max-width:100%}
         }
         @media (max-width:560px){
-          .card{max-width:100%}
+          .card{max-width:100%; margin-left:auto; margin-right:auto}
           .lead{max-width:100%}
           .contact-grid{grid-template-columns:1fr}
           .contact-grid.readonly{grid-template-columns:1fr}
-          .row-actions{gap:8px}
+          .row-actions{gap:8px; padding:10px 10px 14px}
         }
 
         /* Die Hero-Card hält immer einen Seitenabstand auf Mobile/kleineren Displays */

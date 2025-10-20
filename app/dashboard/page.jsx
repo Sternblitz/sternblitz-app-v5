@@ -227,7 +227,9 @@ export default function DashboardPage() {
       </section>
 
       {/* Live-Simulator – unverändert */}
-      <LiveSimulator />
+      <section className="simulator-section">
+        <LiveSimulator />
+      </section>
 
       {/* CTA unten, elegant eingebunden */}
       {!formOpen && (
@@ -485,13 +487,13 @@ export default function DashboardPage() {
         }
 
         /* ————— 2) HERO ————— */
-        .hero { padding: 6px 0 2px; }
+        .hero { margin-top:20px; padding:0; }
         .hero-inner{ max-width:1208px; margin:0 auto; padding: 0 4px; }
         .hero-copy{ max-width: 860px; }
         .headline{ margin:0; font-size: 40px; line-height:1.1; letter-spacing:-.3px }
 
         /* ————— 3) SCHRITTE ————— */
-        .steps{ padding: 4px 0 6px; }
+        .steps{ margin: 20px 0; padding:0; }
         .steps-row{ max-width:1208px; margin:0 auto; padding: 4px; list-style:none; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap }
         .step-card{
           position:relative; overflow:hidden; border-radius:11px; padding:8px 10px;
@@ -504,6 +506,8 @@ export default function DashboardPage() {
         .emoji{ font-size:16px; line-height:1; }
         .step-title{ font-weight:700; font-size:13.8px; letter-spacing:.2px }
         .arrow{ color: rgba(100,116,139,.32); font-size:16px; padding:0 2px; display:flex; align-items:center; justify-content:center; flex:0 0 16px }
+
+        .simulator-section{ margin: 0 auto 0; }
 
         /* CTA */
         .bottom-cta{ padding: 14px 0 6px; }

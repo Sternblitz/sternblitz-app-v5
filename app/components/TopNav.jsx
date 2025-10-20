@@ -67,11 +67,12 @@ export default function TopNav() {
           border-bottom: 1px solid rgba(0, 0, 0, 0.05);
           box-shadow: 0 8px 28px rgba(0, 0, 0, 0.04);
         }
-        .spacer { height: 72px; }
+        /* For sticky nav we don't need extra offset */
+        .spacer { height: 0; }
         .inner {
           max-width: 1200px;
           margin: 0 auto;
-          padding: 12px 20px;
+          padding: 14px 22px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -86,7 +87,7 @@ export default function TopNav() {
           cursor: pointer;
         }
         .logo {
-          height: 46px;
+          height: 52px;
           width: auto;
           object-fit: contain;
           transition: transform 0.2s ease;
@@ -111,7 +112,7 @@ export default function TopNav() {
           justify-content: center;
           gap: 8px;
           padding: 0 20px;
-          height: 42px;
+          height: 44px;
           border-radius: 999px;
           font-weight: 800;
           font-size: 15px;
@@ -156,14 +157,15 @@ export default function TopNav() {
 
         /* Responsiv */
         @media (max-width: 900px) {
-          .logo { height: 38px; }
-          .btn { height: 38px; padding: 0 16px; font-size: 14px; }
+          .inner { padding: 12px 18px; }
+          .logo { height: 44px; }
+          .btn { height: 40px; padding: 0 16px; font-size: 14px; }
         }
         @media (max-width: 640px) {
           .inner { padding: 10px 14px; }
-          .logo { height: 32px; }
+          .logo { height: 38px; }
           .actions { gap: 8px; }
-          .btn { height: 36px; padding: 0 12px; font-size: 13.5px; }
+          .btn { height: 38px; padding: 0 14px; font-size: 13.5px; }
         }
       `}</style>
     </>
