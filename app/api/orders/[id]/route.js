@@ -36,3 +36,22 @@ export async function DELETE(_req, { params }) {
     return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
   }
 }
+
+export async function GET(_req, { params }) {
+  try {
+    const id = params?.id;
+    if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
+    // Minimal public read: fetch limited fields via admin (used by external payment link)
+    const admin = supabaseAdmin();
+    const { data, error } = await admin
+      .from("orders")
+      .select("id, email, first_name, last_name, company")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (!data) return NextResponse.json({ error: "Nicht gefunden" }, { status: 404 });
+    return NextResponse.json({ ok: true, order: data });
+  } catch (e) {
+    return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
+  }
+}

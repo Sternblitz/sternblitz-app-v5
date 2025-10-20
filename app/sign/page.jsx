@@ -277,7 +277,9 @@ export default function SignPage() {
       if (!res.ok) throw new Error(json?.error || "Unbekannter Fehler");
 
       alert("Auftragsbestätigung erstellt.");
-      // Optional: router.push("/thanks")
+      try { sessionStorage.setItem('sb_order_id', json?.orderId || ''); } catch(_) {}
+      // Direkt zur Zahlungsseite weiterleiten (Karte/SEPA hinterlegen)
+      try { window.location.assign('/sign/payment'); } catch(_) {}
     } catch (e) {
       alert("Fehler: " + (e?.message || String(e)));
     } finally {
@@ -298,127 +300,127 @@ export default function SignPage() {
         strategy="afterInteractive"
         onLoad={onPlacesLoad}
       />
-
-      {/* HERO – schmaler */}
-      <section className="card card-hero">
-        <div className="hero-head">
-          <img
-            className="logo"
-            src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/68ad4679902a5d278c4cf0bc_Group%202085662922-p-500.png"
-            alt="Sternblitz"
-          />
-        </div>
-        <h1>Auftragsbestätigung <b>Sternblitz</b></h1>
-        <p className="lead">
-          Hiermit bestätige ich den Auftrag zur Löschung meiner negativen Google-Bewertungen.
-        </p>
-
-        <div className="bullets">
-          <div className="bullet">
-            <span className="tick">✅</span>
-            <span>Fixpreis: <b>299 €</b> (einmalig)</span>
+      <div className="page-container">
+        {/* HERO */}
+        <section className="card card-hero">
+          <div className="hero-head">
+            <img
+              className="logo"
+              src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/68ad4679902a5d278c4cf0bc_Group%202085662922-p-500.png"
+              alt="Sternblitz"
+            />
           </div>
-          <div className="bullet">
-            <span className="tick">✅</span>
-            <span>Zahlung erst nach Löschung (von mind. 90 % der Bewertungen)</span>
-          </div>
-          <div className="bullet">
-            <span className="tick">✅</span>
-            <span>Dauerhafte Entfernung</span>
-          </div>
-        </div>
-      </section>
+          <h1>Auftragsbestätigung <b>Sternblitz</b></h1>
+          <p className="lead">
+            Hiermit bestätige ich den Auftrag zur Löschung meiner negativen Google-Bewertungen.
+          </p>
 
-      {/* GRID: Profil + Option */}
-      <section className="grid-2">
-        {/* Google-Profil */}
-        <div className="card with-bar green">
-          <div className="bar">
-            <span>Google-Profil</span>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => {
-                setEditProfile((v) => !v);
-                setTimeout(() => formGoogleInputRef.current?.focus(), 30);
-              }}
-              title="Profil bearbeiten"
-            >
-              ✏️
-            </button>
-          </div>
-
-          {!editProfile ? (
-            <div className="content">
-              <div className="value">{summary.googleProfile || "—"}</div>
-              {summary.googleUrl ? (
-                <a className="open" href={summary.googleUrl} target="_blank" rel="noreferrer">Profil öffnen ↗</a>
-              ) : null}
+          <div className="bullets">
+            <div className="bullet">
+              <span className="tick">✅</span>
+              <span>Fixpreis: <b>299 €</b> (einmalig)</span>
             </div>
-          ) : (
+            <div className="bullet">
+              <span className="tick">✅</span>
+              <span>Zahlung erst nach Löschung (von mind. 90 % der Bewertungen)</span>
+            </div>
+            <div className="bullet">
+              <span className="tick">✅</span>
+              <span>Dauerhafte Entfernung</span>
+            </div>
+          </div>
+        </section>
+
+        {/* GRID: Profil + Option */}
+        <section className="grid-2">
+          {/* Google-Profil */}
+          <div className="card with-bar green">
+            <div className="bar">
+              <span>Google-Profil</span>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => {
+                  setEditProfile((v) => !v);
+                  setTimeout(() => formGoogleInputRef.current?.focus(), 30);
+                }}
+                title="Profil bearbeiten"
+              >
+                ✏️
+              </button>
+            </div>
+
+            {!editProfile ? (
+              <div className="content">
+                <div className="value">{summary.googleProfile || "—"}</div>
+                {summary.googleUrl ? (
+                  <a className="open" href={summary.googleUrl} target="_blank" rel="noreferrer">Profil öffnen ↗</a>
+                ) : null}
+              </div>
+            ) : (
+              <div className="content">
+                <input
+                  ref={formGoogleInputRef}
+                  type="search"
+                  inputMode="search"
+                  placeholder='Unternehmen suchen … z. B. "Restaurant XY, Berlin"'
+                  value={googleField}
+                  onChange={(e) => setGoogleField(e.target.value)}
+                  className="text"
+                />
+                <div className="row-actions">
+                  <button type="button" className="btn ghost" onClick={() => { setEditProfile(false); setGoogleField(summary.googleProfile || ""); }}>
+                    Abbrechen
+                  </button>
+                  <button
+                    type="button"
+                    className="btn solid"
+                    onClick={() => {
+                      setSummary((s) => ({ ...s, googleProfile: googleField }));
+                      const parts = (googleField || "").split(",");
+                      const manualName = (parts.shift() || "").trim();
+                      const manualAddress = parts.join(",").trim();
+                      setProfileSource({
+                        name: manualName,
+                        address: manualAddress,
+                      });
+                      try {
+                        const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
+                        const payload = JSON.parse(raw);
+                        payload.googleProfile = googleField;
+                        sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
+                      } catch {}
+                      setEditProfile(false);
+                    }}
+                  >
+                    Speichern
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Zu löschende Bewertungen */}
+          <div className="card with-bar blue">
+            <div className="bar">
+              <span>Zu löschende Bewertungen</span>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setEditOptionOpen(true)}
+                title="Bewertungs-Option ändern"
+              >
+                ✏️
+              </button>
+            </div>
+
             <div className="content">
-              <input
-                ref={formGoogleInputRef}
-                type="search"
-                inputMode="search"
-                placeholder='Unternehmen suchen … z. B. "Restaurant XY, Berlin"'
-                value={googleField}
-                onChange={(e) => setGoogleField(e.target.value)}
-                className="text"
-              />
-              <div className="row-actions">
-                <button type="button" className="btn ghost" onClick={() => { setEditProfile(false); setGoogleField(summary.googleProfile || ""); }}>
-                  Abbrechen
-                </button>
-                <button
-                  type="button"
-                  className="btn solid"
-                  onClick={() => {
-                    setSummary((s) => ({ ...s, googleProfile: googleField }));
-                    const parts = (googleField || "").split(",");
-                    const manualName = (parts.shift() || "").trim();
-                    const manualAddress = parts.join(",").trim();
-                    setProfileSource({
-                      name: manualName,
-                      address: manualAddress,
-                    });
-                    try {
-                      const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
-                      const payload = JSON.parse(raw);
-                      payload.googleProfile = googleField;
-                      sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-                    } catch {}
-                    setEditProfile(false);
-                  }}
-                >
-                  Speichern
-                </button>
+              <div className="value">
+                {chosenLabel} <span className="count">{countText}</span>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Zu löschende Bewertungen */}
-        <div className="card with-bar blue">
-          <div className="bar">
-            <span>Zu löschende Bewertungen</span>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => setEditOptionOpen(true)}
-              title="Bewertungs-Option ändern"
-            >
-              ✏️
-            </button>
           </div>
-
-          <div className="content">
-            <div className="value">
-              {chosenLabel} <span className="count">{countText}</span>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
       {/* Option-Auswahl (Modal) */}
       {editOptionOpen && (
@@ -535,6 +537,7 @@ export default function SignPage() {
           <span aria-hidden>✅</span>
         </button>
       </section>
+      </div>
 
       {/* Styles */}
       <style jsx>{`
@@ -552,8 +555,8 @@ export default function SignPage() {
         /* Vollflächiger Hintergrund (wie Dashboard, dezenter Blau-Verlauf), auch unter der TopBar */
         .shell{
           min-height:100dvh;
-          padding:14px 14px 68px; /* TopNav fügt bereits 72px Spacer ein */
-          display:flex;flex-direction:column;gap:16px;align-items:stretch;
+          padding:14px 0 68px; /* TopNav fügt bereits 72px Spacer ein */
+          display:flex;flex-direction:column;
           position:relative; z-index:0; background:transparent;
           overflow-x:hidden;
         }
@@ -563,21 +566,28 @@ export default function SignPage() {
             radial-gradient(900px 480px at 20% -10%, rgba(11,108,242,0.10) 0%, rgba(11,108,242,0.06) 30%, rgba(11,108,242,0.0) 60%),
             linear-gradient(180deg, #f8fbff 0%, #ffffff 55%, #ffffff 100%);
         }
+        .page-container{
+          width:min(920px, 100%);
+          margin:0 auto;
+          padding:20px 18px 40px;
+          display:flex;
+          flex-direction:column;
+          gap:18px;
+          box-sizing:border-box;
+        }
         .card{
           width:100%;
           max-width:880px;
-          margin-left:auto; margin-right:auto; /* echte Zentrierung */
           background:var(--card);
           border:1px solid rgba(15,23,42,.08);
           border-radius:20px;
           box-shadow:var(--shadow);
           overflow:hidden;
+          box-sizing:border-box;
         }
         .card-hero{
           text-align:left;
           padding:22px 22px 16px;
-          margin-top:20px; /* identisch zum Dashboard-Hero-Abstand */
-          margin-left:auto; margin-right:auto; /* absolute Zentrierung */
           background: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,.88) 58%, #ffffff 100%);
           box-shadow: var(--shadow);
         }
@@ -598,7 +608,15 @@ export default function SignPage() {
           text-align:left;
         }
         .tick{font-size:16px;line-height:1.2}
-        .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:880px;width:100%}
+        .grid-2{
+          display:grid;
+          grid-template-columns:repeat(2,minmax(0,1fr));
+          gap:16px;
+          width:100%;
+          max-width:880px;
+          margin:0 auto;
+          box-sizing:border-box;
+        }
         .with-bar .bar{
           display:flex;align-items:center;justify-content:space-between;gap:10px;
           padding:8px 12px;font-weight:900;color:#0b0b0b;border-bottom:1px solid rgba(15,23,42,.06);
@@ -606,7 +624,7 @@ export default function SignPage() {
         .with-bar.blue .bar{background:linear-gradient(90deg, rgba(11,108,242,.18), rgba(11,108,242,.08));}
         .with-bar.green .bar{background:linear-gradient(90deg, rgba(34,197,94,.22), rgba(34,197,94,.10));}
         .with-bar.yellow .bar{background:linear-gradient(90deg, rgba(251,188,5,.25), rgba(251,188,5,.10));}
-        .with-bar .content{padding:12px 14px 14px}
+        .with-bar .content{padding:12px 16px 16px}
         .with-bar .value{font-weight:900;color:#0a0a0a; overflow-wrap: anywhere;}
         .with-bar .count{margin-left:8px;color:var(--blue);font-weight:900}
         .icon-btn{
@@ -619,15 +637,30 @@ export default function SignPage() {
           width:100%;height:36px;border-radius:10px;border:1px solid rgba(0,0,0,.12);padding:6px 10px;
         }
         /* Edit-Aktionsleiste unten rechts, mit Luft und klarer Optik */
-        .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;padding:10px 14px 14px;border-top:1px solid rgba(15,23,42,.06);width:100%}
-        .row-actions .btn{min-width:110px}
-        .btn{border-radius:10px;height:30px;padding:0 12px;font-weight:900;letter-spacing:.2px;cursor:pointer}
-        .btn.ghost{border:1px solid #cbd5e1;background:#fff;color:#111;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+        .row-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:12px;padding:12px 16px 16px;border-top:1px solid rgba(15,23,42,.08);width:100%;flex-wrap:wrap;box-sizing:border-box}
+        .row-actions .btn{min-width:120px}
+        .btn{
+          display:inline-flex;align-items:center;justify-content:center;
+          border-radius:10px;height:34px;padding:0 16px;
+          font-weight:800;font-size:14px;letter-spacing:.2px;cursor:pointer;
+          transition:transform .15s ease, box-shadow .18s ease, background .18s ease;
+          box-sizing:border-box;
+        }
+        .btn:active{transform:scale(.98)}
+        .btn.ghost{
+          border:1px solid rgba(15,23,42,.12);
+          background:#fff;
+          color:#0f172a;
+          box-shadow:0 2px 8px rgba(15,23,42,.06);
+        }
         .btn.ghost:hover{background:#f8fafc}
-        .btn.solid{border:1px solid #0b6cf2;background:#0b6cf2;color:#fff}
-        
-        .btn.ghost{border:1px solid var(--line);background:#fff}
-        .btn.solid{border:1px solid #0b6cf2;background:#0b6cf2;color:#fff}
+        .btn.solid{
+          border:1px solid #0b6cf2;
+          background:linear-gradient(135deg,#0b6cf2 0%,#3b82f6 100%);
+          color:#fff;
+          box-shadow:0 8px 20px rgba(11,108,242,.25);
+        }
+        .btn.solid:hover{filter:brightness(1.05);box-shadow:0 12px 26px rgba(11,108,242,.32)}
         .btn.full{width:100%;justify-content:center}
         .open{display:inline-flex;margin-top:6px;color:#0b6cf2;font-weight:800}
         .modal{
@@ -646,12 +679,12 @@ export default function SignPage() {
         }
         .opt:hover{background:#f6faff}
         .opt.on{background:#eef5ff;border-color:#0b6cf2}
-        .contact-grid{display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:10px;padding:12px 14px}
+        .contact-grid{display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:12px;padding:12px 16px}
         .contact-grid.readonly{grid-template-columns:repeat(3, minmax(0,1fr))}
         .contact-grid label{display:flex;flex-direction:column;gap:6px}
         .contact-grid label input{height:34px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:6px 10px}
         .contact-grid span{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.04em}
-        .signature{padding:12px 14px}
+        .signature{padding:12px 16px 20px}
         .sig-head{display:flex;justify-content:space-between;align-items:center;padding:4px 2px 8px}
         .sig-title{font-size:16px;font-weight:900}
         .pad-wrap{border:1px dashed #cbd5e1;border-radius:16px;background:#fff;padding:12px;box-shadow:var(--shadow-soft)}
@@ -672,21 +705,24 @@ export default function SignPage() {
         .confirm:disabled{opacity:.6;cursor:not-allowed}
         @media (max-width:1000px){
           .grid-2{grid-template-columns:1fr}
-          .contact-grid{grid-template-columns:1fr 1fr}
-          .contact-grid.readonly{grid-template-columns:1fr 1fr}
+          .contact-grid{grid-template-columns:repeat(2, minmax(0,1fr))}
+          .contact-grid.readonly{grid-template-columns:repeat(2, minmax(0,1fr))}
           .pad{max-width:100%}
         }
-        @media (max-width:560px){
-          .card{max-width:100%; margin-left:auto; margin-right:auto}
-          .lead{max-width:100%}
+        @media (max-width:640px){
+          .page-container{padding:18px 16px 36px;gap:16px}
+          .card-hero{padding:20px 18px 14px}
+          .grid-2{gap:14px}
           .contact-grid{grid-template-columns:1fr}
           .contact-grid.readonly{grid-template-columns:1fr}
-          .row-actions{gap:8px; padding:10px 10px 14px}
+          .row-actions{justify-content:stretch;padding:12px 14px 14px;gap:10px}
+          .row-actions .btn{width:100%}
         }
-
-        /* Die Hero-Card hält immer einen Seitenabstand auf Mobile/kleineren Displays */
-        /* Hero-Card zentriert; Seitenabstand kommt von .shell padding */
-        .card-hero{ margin-left:auto; margin-right:auto }
+        @media (max-width:420px){
+          .btn{height:32px;padding:0 14px;font-size:13.5px}
+          .page-container{padding:16px 14px 32px}
+          .card-hero{padding:20px 16px 12px}
+        }
         .actions {
           display: flex;
           justify-content: center;

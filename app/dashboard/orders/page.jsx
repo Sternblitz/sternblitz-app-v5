@@ -36,6 +36,7 @@ export default function OrdersPage() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [boardMode, setBoardMode] = useState("reps"); // 'reps' | 'teams'
   const [savingStatusId, setSavingStatusId] = useState(null);
+  const [qrForId, setQrForId] = useState(null);
   const [notesDraft, setNotesDraft] = useState({}); // { [orderId]: { sales: string, admin: string } }
 
   const dateFormatter = useMemo(
@@ -461,6 +462,24 @@ export default function OrdersPage() {
       }
     };
 
+    const payStatus = row?.payment_status || null;
+    const pmOnFile = Boolean(row?.stripe_payment_method_id);
+    const canCharge = me?.role === "ADMIN" && pmOnFile && payStatus !== "paid" && payStatus !== "processing";
+
+    const onCharge = async () => {
+      if (!canCharge) return;
+      if (!confirm("Jetzt 299 € abbuchen?")) return;
+      try {
+        const res = await fetch(`/api/orders/${row.id}/charge`, { method: "POST" });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.error || "Fehler beim Abbuchen");
+        setRows((prev) => prev.map((it) => it.id === row.id ? { ...it, payment_status: json?.order?.payment_status || it.payment_status, payment_last_event: json?.order?.payment_last_event || it.payment_last_event, charged_amount: json?.order?.charged_amount ?? it.charged_amount } : it));
+        alert(`Abbuchung gestartet: ${json?.payment_intent?.status}`);
+      } catch (e) {
+        alert(e?.message || String(e));
+      }
+    };
+
     return (
       <article className={`order-row ${expanded ? "is-open" : ""}`} key={row.id}>
         <div className="summary">
@@ -484,6 +503,11 @@ export default function OrdersPage() {
                 <span>🔄 {formatDate(metrics.lastRefresh)}</span>
                 <span>⭐ {option}</span>
               </p>
+              <div className="pay-line">
+                <span className={`pill ${pmOnFile ? 'ok' : 'warn'}`}>{pmOnFile ? 'Zahlungsmittel hinterlegt' : 'Keine Zahlungsdaten'}</span>
+                {payStatus ? <span className="pill info">Status: {payStatus}</span> : null}
+                {row?.charged_amount ? <span className="pill ok">Bezahlt: {formatEUR(row.charged_amount/100)}</span> : null}
+              </div>
             </div>
             <div className="summary-actions">
               <button
@@ -494,6 +518,9 @@ export default function OrdersPage() {
               >
                 {expanded ? "🔼 Zuklappen" : "🔎 Details"}
               </button>
+              {canCharge ? (
+                <button type="button" className="mini-btn primary" onClick={onCharge}>299 € abbuchen</button>
+              ) : null}
               {me?.role === "ADMIN" && (
                 <StatusControl
                   value={normalizeStatus(row?.status)}
@@ -624,6 +651,17 @@ export default function OrdersPage() {
                   {row?.pdf_path ? (
                     <span className="hint">Storage: {row.pdf_path}</span>
                   ) : null}
+                  {!pmOnFile ? (
+                    <>
+                      <a className="cta-link" href={`/sign/payment?order=${row.id}`} target="_blank" rel="noreferrer">Zahlungsart hinzufügen ↗</a>
+                      <button type="button" className="mini-btn qr" onClick={() => setQrForId(qrForId === row.id ? null : row.id)}>QR anzeigen</button>
+                      {qrForId === row.id ? (
+                        (() => { const origin = typeof window !== 'undefined' ? window.location.origin : ''; return (
+                          <img className="qr" alt="QR zur Zahlungsseite" src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(origin + '/sign/payment?order=' + row.id)}`} />
+                        ); })()
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               </div>
 
@@ -642,7 +680,7 @@ export default function OrdersPage() {
                     className="notes"
                     value={draft.admin}
                     onChange={(e) => setDraft({ admin: e.target.value })}
-                    placeholder="Nur für Admin sichtbar/bearbeitbar"
+                    placeholder="Nur von Admin bearbeitbar"
                     disabled={!canEditAdmin}
                   />
                   {canEditAdmin ? (
@@ -688,11 +726,17 @@ export default function OrdersPage() {
           .tag-wait { background:#fef3c7; color:#92400e; border-color: rgba(245, 158, 11, .35); }
           .summary-address { color:#475569; margin: 2px 0 0; font-size: 14px; }
           .summary-meta { display:flex; flex-wrap:wrap; gap: 8px 14px; margin: 6px 0 0; color:#64748b; font-size: 13px; }
+          .pay-line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px }
+          .pill { display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; font-size:12px; font-weight:800; border:1px solid #e5e7eb; background:#fff; color:#334155 }
+          .pill.ok { border-color:#16a34a33; background:#ecfdf5; color:#065f46 }
+          .pill.warn { border-color:#f59e0b33; background:#fffbeb; color:#92400e }
+          .pill.info { border-color:#0b6cf233; background:#eef5ff; color:#0b6cf2 }
           .summary-actions { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
           .team-line { margin: 2px 0 0; font-size: 12px; color:#0b6cf2; font-weight: 800; }
           .mini-btn { height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #e5e7eb; background:#fff; font-weight: 700; font-size: 13px; cursor: pointer; }
           .mini-btn:hover { transform: translateY(-1px); box-shadow:0 2px 10px rgba(0,0,0,.06); }
           .mini-btn.blue { border-color:#0b6cf2; color:#0b6cf2; background:#f0f6ff; }
+          .mini-btn.primary { border-color:#0b6cf2; background:#0b6cf2; color:#fff }
           .status-select { height: 34px; border-radius: 10px; border: 1px solid #e5e7eb; background:#fff; padding: 0 8px; font-weight: 700; font-size: 13px; }
           .summary-stats { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
           .stat { background:#f8fafc; border:1px solid #eef2f7; border-radius: 14px; padding: 12px; }
@@ -715,6 +759,9 @@ export default function OrdersPage() {
           .detail-value { font-weight: 600; color:#0f172a; }
           .detail-value.empty { color:#94a3b8; font-weight: 500; }
           .detail-value.links { display:flex; flex-direction: column; gap: 6px; }
+          .detail-value .cta-link { font-weight:800; color:#0b6cf2; text-decoration:none }
+          .mini-btn.qr { border-color:#e5e7eb; background:#fff; }
+          .qr { width:220px; height:220px; margin-top:6px; border:1px solid #e5e7eb; border-radius:10px; }
           .hint { color:#94a3b8; font-size: 12px; }
           .notes { width: 100%; min-height: 84px; box-sizing: border-box; display:block; border-radius: 10px; border: 1px solid #e5e7eb; padding: 8px 10px; font-size: 14px; line-height: 1.4; resize: vertical; background:#fff; color:#0f172a; font-weight: 400; }
           .notes:focus { outline:none; border-color:#0b6cf2; box-shadow: 0 0 0 3px rgba(11,108,242,.16); }
@@ -744,6 +791,10 @@ export default function OrdersPage() {
     return filteredRows.map(renderRow);
   };
 
+  const greetingName = (me?.full_name || "").trim();
+  const greetingLine = greetingName ? `Hallo ${greetingName} 🚀` : "Hallo 🚀";
+  const greetingSub = "Hier sind deine Aufträge – let's go!";
+
   return (
     <main className="orders-shell">
       <section className="chart-panel">
@@ -751,8 +802,8 @@ export default function OrdersPage() {
       </section>
       <header className="orders-head">
         <div className="title">
-          <h1>Aufträge</h1>
-          <p className="sub">Alle Bestellungen im Überblick.</p>
+          <h1>{greetingLine}</h1>
+          <p className="sub">{greetingSub}</p>
         </div>
         <div className="actions">
           <Link className="action-btn" href="/dashboard">
@@ -865,11 +916,12 @@ export default function OrdersPage() {
       </section>
 
       <style jsx>{`
-        .chart-panel { max-width: 1200px; margin: 0 auto; padding: 0 18px 6px; }
-        .orders-shell { max-width: 1200px; margin: 0 auto; padding: 16px 18px; }
-        .orders-head { display:flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .title h1 { font-size: 28px; margin:0; }
-        .title .sub { margin: 4px 0 0; color:#64748b; }
+        .chart-panel { max-width: 1200px; margin: 0 auto; padding: 0 0 12px; box-sizing: border-box; }
+        .orders-shell { max-width: 1200px; margin: 0 auto; padding: 20px 18px 40px; box-sizing: border-box; }
+        .orders-head { display:flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .title { display:flex; flex-direction:column; gap:4px; }
+        .title h1 { font-size: 30px; margin:0; font-weight:900; letter-spacing:-0.2px; }
+        .title .sub { margin: 0; color:#64748b; font-size:14px; font-weight:600; }
         .action-btn { display:inline-flex; align-items:center; height:38px; padding:0 12px; border-radius:10px; background:#0b6cf2; color:#fff; font-weight:800; border:1px solid rgba(11,108,242,.22); }
 
         .summary-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 12px; }
@@ -911,8 +963,13 @@ export default function OrdersPage() {
           .summary-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
+        @media (max-width: 900px) {
+          .grid-2 { grid-template-columns: 1fr; }
+        }
         @media (max-width: 640px) {
           .summary-grid { grid-template-columns: 1fr; }
+          .title h1 { font-size: 26px; }
+          .title .sub { font-size: 13px; }
         }
         @media (max-width: 800px) {
           .orders-head { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -1085,16 +1142,17 @@ function SalesRing({ rows }) {
         </div>
       </div>
       <style jsx>{`
-        .kpi-wrap { display:flex; align-items:center; gap: 16px; flex-wrap: wrap; background:#fff; border:1px solid #eef2f7; border-radius: 16px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.04); }
+        .kpi-wrap { display:flex; align-items:center; gap: 16px; flex-wrap: wrap; background:#fff; border:1px solid #eef2f7; border-radius: 16px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.04); width:100%; box-sizing:border-box; }
         .ring { width: 120px; height: 120px; border-radius: 50%; position: relative; flex: none; }
         .hole { position:absolute; inset: 16px; border-radius: 50%; background: #fff; display:flex; flex-direction: column; align-items:center; justify-content:center; border: 1px solid #eef2f7; }
         .big { font-size: 22px; font-weight: 800; line-height: 1; }
         .sub { font-size: 12px; color:#64748b; margin-top: 2px; }
-        .stats { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; flex:1; min-width: 260px; }
+        .stats { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; flex:1; min-width:0; }
         .it { background:#f8fafc; border:1px solid #eef2f7; border-radius: 12px; padding: 10px 12px; }
         .lab { font-size: 12px; color:#64748b; }
         .val { font-weight: 800; margin-top: 4px; display:flex; align-items:center; gap:8px; }
-        @media (max-width: 800px) { .stats { grid-template-columns: 1fr; } .ring { width: 100px; height: 100px; } }
+        @media (max-width: 960px) { .kpi-wrap { flex-direction: column; align-items: stretch; gap: 12px; } .ring { align-self: center; width: 110px; height: 110px; } .stats { width: 100%; grid-template-columns: repeat(2, minmax(0,1fr)); } }
+        @media (max-width: 560px) { .ring { width: 100px; height: 100px; } .stats { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );

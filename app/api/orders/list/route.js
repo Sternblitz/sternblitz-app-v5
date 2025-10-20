@@ -92,6 +92,18 @@ export async function GET(req) {
         last_refreshed_at,
         review_name,
         review_address
+        ,
+        stripe_customer_id,
+        stripe_payment_method_id,
+        stripe_setup_intent_id,
+        stripe_payment_intent_id,
+        payment_method_type,
+        payment_status,
+        payment_receipt_url,
+        payment_last_event,
+        charged_amount,
+        charge_currency,
+        charged_at
       `)
       .order("created_at", { ascending: false })
       .limit(200);
