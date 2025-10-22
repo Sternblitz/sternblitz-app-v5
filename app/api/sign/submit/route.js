@@ -1,11 +1,22 @@
 // app/api/sign/submit/route.js
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { cookies } from "next/headers";
 import { Resend } from "resend";
+import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 
 export const runtime = "nodejs"; // Node, nicht Edge
+
+const BASE_PRICE_CENTS = 29900;
+
+const fmtEUR = (cents) =>
+  new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format((Number(cents) || 0) / 100);
 
 // ---------- Helpers ----------
 function dataUrlToUint8(signaturePng) {
@@ -16,10 +27,20 @@ function dataUrlToUint8(signaturePng) {
 
 // WinAnsi: Emojis entfernen
 function toWinAnsi(text = "") {
-  return String(text).replace(
-    /[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F9FF}\u{2600}-\u{27BF}]/gu,
-    ""
-  );
+  let s = String(text);
+  // Remove emoji and miscellaneous symbols
+  s = s.replace(/[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F9FF}\u{2600}-\u{27BF}]/gu, "");
+  // Replace common unsupported punctuation with ASCII fallbacks
+  s = s
+    .replace(/\u2192/g, "->")  // right arrow →
+    .replace(/\u2190/g, "<-")  // left arrow ←
+    .replace(/[\u2013\u2014]/g, "-") // en/em dash – —
+    .replace(/\u2022/g, "-")   // bullet •
+    .replace(/\u2026/g, "...") // ellipsis …
+    .replace(/\u2011/g, "-")   // non-breaking hyphen ‑
+    .replace(/[\u00A0\u202F\u2007\u2009]/g, " ") // non-breaking / thin spaces
+    .replace(/[\u2605\u2728]/g, "*"); // stars to *
+  return s;
 }
 
 function labelFor(opt) {
@@ -41,12 +62,58 @@ function safeFileBase(name) {
   return (name || "kunde").toString().trim().replace(/[^a-z0-9_-]+/gi, "_") || "kunde";
 }
 
-function makePromoCode(firstName = "", lastName = "") {
+function referralBase(firstName = "", lastName = "") {
   const fn = (firstName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const ln = (lastName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const firstL = ln.slice(0, 1);
-  const lastL = ln.slice(-1);
-  return `${fn}${firstL}${lastL}25`;
+  const firstL = ln.slice(0, 1) || "x";
+  const lastL = ln.slice(-1) || "z";
+  const base = `${fn.slice(0, 5)}${firstL}${lastL}25`.replace(/[^a-z0-9]/g, "");
+  const clean = base || "stern25";
+  return clean.toUpperCase();
+}
+
+function randomSuffix(len = 3) {
+  const raw = crypto.randomBytes(len).toString("base64").replace(/[^a-z0-9]/gi, "");
+  return (raw || "xyz").slice(0, len).toUpperCase();
+}
+
+function makePromoCode(firstName = "", lastName = "") {
+  return referralBase(firstName, lastName);
+}
+
+async function ensureReferralCode(admin, orderId, firstName, lastName) {
+  if (!orderId) return referralBase(firstName, lastName);
+  try {
+    const { data: existing } = await admin
+      .from("referral_codes")
+      .select("code")
+      .eq("referrer_order_id", orderId)
+      .maybeSingle();
+    if (existing?.code) return existing.code;
+  } catch {}
+
+  const base = referralBase(firstName, lastName);
+  let candidate = base.length >= 5 ? base : `${base}${randomSuffix(3)}`;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const { data } = await admin
+        .from("referral_codes")
+        .insert({ code: candidate, referrer_order_id: orderId })
+        .select("code")
+        .maybeSingle();
+      if (data?.code) return data.code;
+      return candidate;
+    } catch (e) {
+      const errText = `${e?.code || e?.message || ""}`;
+      if (errText.includes("duplicate") || errText.includes("23505")) {
+        candidate = `${base}${randomSuffix(2 + attempt)}`.slice(0, 12);
+        continue;
+      }
+      break;
+    }
+  }
+  return candidate;
 }
 
 function isValidFromOrReplyTo(s = "") {
@@ -104,13 +171,20 @@ function sanitizeStats(stats) {
 }
 
 // ---------- PDF ----------
-async function buildPdf(p, sigBytes) {
+async function buildPdf(p, sigBytes, priceInfo = {}) {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595, 842]); // A4
   const { height } = page.getSize();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const draw = (txt, opts) => page.drawText(toWinAnsi(txt), opts);
+
+  const discountCents = Number(priceInfo.discountCents || 0);
+  const finalCents = Number(priceInfo.finalCents || (BASE_PRICE_CENTS - discountCents));
+  const pricePromoCode = priceInfo.promoCode ? String(priceInfo.promoCode).toUpperCase() : null;
+  const priceLine = discountCents > 0
+    ? `Fixpreis: ${fmtEUR(BASE_PRICE_CENTS)} → ${fmtEUR(finalCents)}${pricePromoCode ? ` (Promo ${pricePromoCode})` : " (Promo aktiv)"}`
+    : `Fixpreis: ${fmtEUR(BASE_PRICE_CENTS)} (einmalig)`;
 
   let y = height - 70;
   draw("Auftragsbestätigung Sternblitz", { x: 50, y, font: bold, size: 20, color: rgb(0,0,0) });
@@ -120,7 +194,7 @@ async function buildPdf(p, sigBytes) {
 
   y -= 25;
   for (const b of [
-    "Fixpreis: 299 € (einmalig)",
+    priceLine,
     "Zahlung erst nach Löschung (von mind. 90 % der Bewertungen)",
     "Dauerhafte Entfernung",
   ]) {
@@ -133,6 +207,10 @@ async function buildPdf(p, sigBytes) {
   y -= 16;
 
   const lines = [
+    ["Preis", discountCents > 0
+      ? `${fmtEUR(BASE_PRICE_CENTS)} → ${fmtEUR(finalCents)}${pricePromoCode ? ` (Promo ${pricePromoCode})` : ""}`
+      : `${fmtEUR(BASE_PRICE_CENTS)} (einmalig)`],
+    ...(pricePromoCode ? [["Promo‑Code", `angewendet: ${pricePromoCode}`]] : []),
     ["Google-Profil", p.googleProfile],
     ["Bewertungen", labelFor(p.selectedOption)],
     ["Firma", p.company],
@@ -199,6 +277,7 @@ export async function POST(req) {
       statsSource,
       rep_code = null,        // neu: wird mitgespeichert
       source_account_id = null, // neu: wird mitgespeichert
+      referralCode = null,
     } = body || {};
 
     const normalizedGoogleProfile =
@@ -235,43 +314,76 @@ export async function POST(req) {
     }
 
     const supabase = supabaseServerAuth();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData?.user || null;
     if (userError) {
-      return NextResponse.json({ error: userError.message }, { status: 401 });
-    }
-    if (!user) {
-      return NextResponse.json({ error: "Session erforderlich." }, { status: 401 });
+      // Wenn Supabase-Session fehlschlägt, trotzdem weiter (öffentlicher Referral-Flow)
+      console.warn("sign/submit getUser error (ignoriere für Referral-Flow)", userError);
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error("sign/submit profile error", profileError);
-      return NextResponse.json({ error: "Profil konnte nicht geladen werden." }, { status: 500 });
+    if (user) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (profileError) {
+        console.error("sign/submit profile error", profileError);
+        return NextResponse.json({ error: "Profil konnte nicht geladen werden." }, { status: 500 });
+      }
+      if (!profile) {
+        return NextResponse.json(
+          { error: "Kein Profil hinterlegt. Bitte Admin benachrichtigen." },
+          { status: 403 }
+        );
+      }
+      if (source_account_id && source_account_id !== user.id) {
+        console.warn("source_account_id does not match session user", {
+          source_account_id,
+          user_id: user.id,
+        });
+      }
     }
-    if (!profile) {
-      return NextResponse.json(
-        { error: "Kein Profil hinterlegt. Bitte Admin benachrichtigen." },
-        { status: 403 }
-      );
-    }
 
-    if (source_account_id && source_account_id !== user.id) {
-      console.warn("source_account_id does not match session user", {
-        source_account_id,
-        user_id: user.id,
-      });
+    const admin = supabaseAdmin();
+    let normalizedReferralCode = (referralCode || "").toString().trim().toUpperCase();
+    // Fallback: Promo aus Cookie `sb_ref` lesen, falls im Body nicht gesetzt
+    if (!normalizedReferralCode) {
+      try {
+        const c = cookies();
+        const cookieVal = c?.get?.("sb_ref")?.value || null;
+        if (cookieVal) normalizedReferralCode = String(cookieVal).trim().toUpperCase();
+      } catch {}
+    }
+    let referralMatch = null;
+    let appliedDiscount = 0;
+    if (normalizedReferralCode) {
+      try {
+        const { data: rc } = await admin
+          .from("referral_codes")
+          .select("code, referrer_order_id, discount_cents, max_uses, uses_count, active, expires_at")
+          .eq("code", normalizedReferralCode)
+          .maybeSingle();
+        const now = new Date();
+        const valid = rc && rc.active && (!rc.expires_at || new Date(rc.expires_at) > now) && rc.uses_count < rc.max_uses;
+        if (valid) {
+          referralMatch = rc;
+          appliedDiscount = Math.max(0, Number(rc.discount_cents || 0));
+        } else {
+          // Fallback: generischer Promo-Rabatt, wenn ein Code angegeben wurde
+          appliedDiscount = Math.max(0, Number(process.env.DEFAULT_REFERRAL_DISCOUNT_CENTS || 2500));
+        }
+      } catch (err) {
+        console.warn("referral lookup failed", err);
+        // Fallback: generischer Promo-Rabatt auch bei Lookup-Fehler
+        appliedDiscount = Math.max(0, Number(process.env.DEFAULT_REFERRAL_DISCOUNT_CENTS || 2500));
+      }
     }
 
     // 1) PDF bauen
     const sigBytes = dataUrlToUint8(signaturePng);
+    const finalPriceCents = Math.max(0, BASE_PRICE_CENTS - appliedDiscount);
+    const usedPromoCode = referralMatch?.code || (normalizedReferralCode || null);
     const pdfBytes = await buildPdf(
       {
         googleProfile: normalizedGoogleProfile,
@@ -283,11 +395,11 @@ export async function POST(req) {
         phone,
         counts,
       },
-      sigBytes
+      sigBytes,
+      { discountCents: appliedDiscount, finalCents: finalPriceCents, promoCode: usedPromoCode }
     );
 
     // 2) Upload zu Supabase Storage (Bucket: contracts)
-    const admin = supabaseAdmin();
     const safeBase = safeFileBase(firstName);
     const fileName = `${Date.now()}_${safeBase}.pdf`;
     const key = storageKeyFor(fileName, rep_code || undefined);
@@ -361,7 +473,19 @@ export async function POST(req) {
       last_refreshed_at: nowIso,
       review_name: reviewName,
       review_address: reviewAddress,
+      total_cents: BASE_PRICE_CENTS,
     };
+
+    if (appliedDiscount > 0) {
+      // markiere Bestellung als Referral auch im Fallback
+      orderPayload.referral_channel = "referral";
+      orderPayload.referral_code = usedPromoCode;
+      if (referralMatch?.referrer_order_id) {
+        orderPayload.referral_referrer_order_id = referralMatch.referrer_order_id;
+      }
+      orderPayload.discount_cents = appliedDiscount;
+      orderPayload.total_cents = finalPriceCents;
+    }
 
     if (rep_code && typeof rep_code === "string") {
       const trimmed = rep_code.trim();
@@ -374,11 +498,39 @@ export async function POST(req) {
       orderPayload.custom_notes = cleanString(body.customNotes);
     }
 
-    const { data: insertedOrder, error: insertError } = await supabase
-      .from("orders")
-      .insert([orderPayload])
-      .select("id, created_at")
-      .maybeSingle();
+    // Wenn eingeloggt: reguläre RLS-Insert. Sonst: Admin-Insert (service_role) mit Org/Team aus Referral ableiten.
+    if (!user && referralMatch?.referrer_order_id) {
+      try {
+        const { data: refOrg } = await admin
+          .from("orders")
+          .select("org_id, team_id")
+          .eq("id", referralMatch.referrer_order_id)
+          .maybeSingle();
+        if (refOrg?.org_id && !orderPayload.org_id) orderPayload.org_id = refOrg.org_id;
+        if (refOrg?.team_id && !orderPayload.team_id) orderPayload.team_id = refOrg.team_id;
+      } catch {}
+    }
+    if (!user && !orderPayload.org_id) {
+      const DEFAULT_ORG_ID = process.env.DEFAULT_ORG_ID || process.env.NEXT_PUBLIC_DEFAULT_ORG_ID || null;
+      if (DEFAULT_ORG_ID) orderPayload.org_id = DEFAULT_ORG_ID;
+    }
+
+    let insertedOrder = null, insertError = null;
+    if (user) {
+      const { data, error } = await supabase
+        .from("orders")
+        .insert([orderPayload])
+        .select("id, created_at")
+        .maybeSingle();
+      insertedOrder = data; insertError = error;
+    } else {
+      const { data, error } = await admin
+        .from("orders")
+        .insert([orderPayload])
+        .select("id, created_at")
+        .maybeSingle();
+      insertedOrder = data; insertError = error;
+    }
 
     if (insertError) {
       console.error("orders insert failed", insertError);
@@ -390,6 +542,19 @@ export async function POST(req) {
       return NextResponse.json({ error: "Auftrag konnte nicht gespeichert werden." }, { status: 500 });
     }
 
+    if (referralMatch) {
+      try {
+        await admin
+          .from("referral_codes")
+          .update({ uses_count: (referralMatch?.uses_count || 0) + 1 })
+          .eq("code", referralMatch.code);
+      } catch (err) {
+        console.warn("referral uses_count update failed", err);
+      }
+    }
+
+    const shareCode = await ensureReferralCode(admin, insertedOrder.id, firstName, lastName);
+
     // 4) E-Mail via Resend
     const resend = new Resend(process.env.RESEND_API_KEY);
     const FROM = process.env.RESEND_FROM || "";
@@ -400,11 +565,32 @@ export async function POST(req) {
 
     const chosenLabel = labelFor(selectedOption);
     const selectedCount = Number(chosenCount(selectedOption, counts) ?? 0);
-    const promo = makePromoCode(firstName, lastName);
-    const referralLink = `https://sternblitz.de/empfehlen?ref=DEMO`; // Platzhalter
+    const promo = shareCode || makePromoCode(firstName, lastName);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://sternblitz.de";
+    // Referral-Fluss: dedizierte Seite /empfehlen mit Eingabefeld für Code
+    const referralLink = `${appUrl.replace(/\/$/, "")}/empfehlen?mine=1&ref=${encodeURIComponent(promo)}`;
     const pdfLine = ATTACH
       ? "Deine Auftragsbestätigung (PDF) findest du im Anhang."
       : "Deine Auftragsbestätigung (PDF) wurde erstellt.";
+
+    const priceHtml = appliedDiscount
+      ? `
+          <div style="border:1px solid #bbf7d0;border-radius:14px;padding:14px 16px;margin:12px 0;background:#f0fdf4">
+            <div style="font-size:12px;color:#047857;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Fixpreis</div>
+            <div style="font-weight:800;color:#065f46">${fmtEUR(BASE_PRICE_CENTS)} → ${fmtEUR(finalPriceCents)}${usedPromoCode ? ` (Promo ${usedPromoCode})` : ""}</div>
+            ${usedPromoCode ? `<div style="font-size:12px;color:#065f46;margin-top:4px">Promo‑Code angewendet: <strong>${usedPromoCode}</strong></div>` : ""}
+          </div>
+        `
+      : `
+          <div style="border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px;margin:12px 0;background:#ffffff">
+            <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Fixpreis</div>
+            <div style="font-weight:700">${fmtEUR(BASE_PRICE_CENTS)} (einmalig)</div>
+          </div>
+        `;
+
+    const priceText = appliedDiscount
+      ? `Fixpreis: ${fmtEUR(BASE_PRICE_CENTS)} → ${fmtEUR(finalPriceCents)}${usedPromoCode ? ` (Promo ${usedPromoCode})` : ""}`
+      : `Fixpreis: ${fmtEUR(BASE_PRICE_CENTS)} (einmalig)`;
 
     const html = `
       <div style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;line-height:1.58;color:#0f172a;background:#ffffff;padding:0;margin:0">
@@ -422,11 +608,13 @@ export async function POST(req) {
             <div style="font-weight:700">${chosenLabel} → ${Number.isFinite(selectedCount) ? selectedCount : "—"} Stück</div>
           </div>
 
+          ${priceHtml}
+
           <p style="margin:16px 0">${pdfLine}</p>
 
           <div style="margin:26px 0 10px;font-weight:800;font-size:16px">Freunde werben & sparen</div>
           <p style="margin:0 0 12px">
-            Teile Sternblitz mit Freund:innen – <strong>sie sparen 25&nbsp;€</strong> auf die Auftragspauschale
+            Teile Sternblitz mit Freunden – <strong>sie sparen 25&nbsp;€</strong> auf die Auftragspauschale
             und du erhältst für jede erfolgreiche Empfehlung einen <strong>25&nbsp;€ Amazon-Gutschein</strong>.
           </p>
 
@@ -437,7 +625,7 @@ export async function POST(req) {
           </div>
 
           <div style="margin:6px 0 22px;font-size:14px">
-            Teilen-Link (Platzhalter):
+            Teilen-Link:
             <a href="${referralLink}" target="_blank" rel="noopener" style="color:#0b6cf2;text-decoration:none">${referralLink}</a>
           </div>
 
@@ -459,13 +647,14 @@ export async function POST(req) {
       `Hallo ${firstName || ""}!\n\n` +
       `Danke für deinen Auftrag. Wir starten jetzt mit der Entfernung der ausgewählten Bewertungen.\n\n` +
       `Google-Profil: ${normalizedGoogleProfile || "—"}\n` +
-      `Auswahl: ${chosenLabel} → ${Number.isFinite(selectedCount) ? selectedCount : "—"} Stück\n\n` +
+      `Auswahl: ${chosenLabel} → ${Number.isFinite(selectedCount) ? selectedCount : "—"} Stück\n` +
+      `${priceText}\n\n` +
       `${pdfLine}\n\n` +
       `Freunde werben & sparen:\n` +
       `• Deine Freunde sparen 25 € auf die Auftragspauschale\n` +
       `• Du erhältst pro erfolgreicher Empfehlung einen 25 € Amazon-Gutschein\n` +
       `Promocode: ${promo} (30 Tage gültig, max. 5 Einlösungen)\n` +
-      `Teilen-Link (Platzhalter): ${referralLink}\n\n` +
+      `Teilen-Link: ${referralLink}\n\n` +
       `(Dies ist eine automatische Mail)\n\n` +
       `Sternblitz Auftragsservice\n` +
       `info@sternblitz.de · sternblitz.de\n`;
@@ -502,6 +691,8 @@ export async function POST(req) {
       pdfUrl,
       pdfPath: key,
       orderId: insertedOrder?.id ?? null,
+      referralCode: promo,
+      discountCents: appliedDiscount,
     });
   } catch (e) {
     console.error("sign/submit error:", e);

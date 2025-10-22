@@ -38,6 +38,7 @@ export default function OrdersPage() {
   const [savingStatusId, setSavingStatusId] = useState(null);
   const [qrForId, setQrForId] = useState(null);
   const [notesDraft, setNotesDraft] = useState({}); // { [orderId]: { sales: string, admin: string } }
+  const [promoOnly, setPromoOnly] = useState(false);
 
   const dateFormatter = useMemo(
     () =>
@@ -361,6 +362,8 @@ export default function OrdersPage() {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
+  const isReferralRow = (r) => (r?.referral_channel === 'referral') || Number(r?.discount_cents || 0) > 0 || !!r?.referral_code;
+
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
     return rows.filter((r) => {
@@ -370,6 +373,7 @@ export default function OrdersPage() {
       }
       if (teamFilter !== "all" && r?.team_id !== teamFilter) return false;
       if (repFilter !== "all" && r?.created_by !== repFilter) return false;
+      if (promoOnly && !isReferralRow(r)) return false;
       if (!term) return true;
       const hay = [
         r?.google_profile,
@@ -386,7 +390,7 @@ export default function OrdersPage() {
         .toLowerCase();
       return hay.includes(term);
     });
-  }, [rows, search, dayFilter, repFilter, teamFilter]);
+  }, [rows, search, dayFilter, repFilter, teamFilter, promoOnly]);
 
   const summary = useMemo(() => {
     const base = filteredRows;
@@ -465,10 +469,16 @@ export default function OrdersPage() {
     const payStatus = row?.payment_status || null;
     const pmOnFile = Boolean(row?.stripe_payment_method_id);
     const canCharge = me?.role === "ADMIN" && pmOnFile && payStatus !== "paid" && payStatus !== "processing";
+    const isReferral = row?.referral_channel === 'referral' || Number(row?.discount_cents || 0) > 0 || !!row?.referral_code;
+    const promoCode = row?.referral_code ? String(row.referral_code).toUpperCase() : null;
+    const promoValue = Number(row?.discount_cents || 0);
+    const chargeAmountCents = Number.isFinite(Number(row?.total_cents)) && Number(row.total_cents) > 0
+      ? Number(row.total_cents)
+      : Math.max(0, 29900 - promoValue);
 
     const onCharge = async () => {
       if (!canCharge) return;
-      if (!confirm("Jetzt 299 € abbuchen?")) return;
+      if (!confirm(`Jetzt ${formatEUR(chargeAmountCents/100)} abbuchen?`)) return;
       try {
         const res = await fetch(`/api/orders/${row.id}/charge`, { method: "POST" });
         const json = await res.json().catch(() => ({}));
@@ -503,6 +513,17 @@ export default function OrdersPage() {
                 <span>🔄 {formatDate(metrics.lastRefresh)}</span>
                 <span>⭐ {option}</span>
               </p>
+              {isReferral ? (
+                <div className="ref-line">
+                  <span className="pill info">Empfehlung</span>
+                  {promoCode ? (
+                    <span className="pill promo">🎉 Promo: {promoCode}{promoValue ? ` (−${formatEUR(promoValue/100)})` : ""}</span>
+                  ) : null}
+                  {promoValue ? (
+                    <span className="pill ok">Promo −{formatEUR(promoValue/100)}</span>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="pay-line">
                 <span className={`pill ${pmOnFile ? 'ok' : 'warn'}`}>{pmOnFile ? 'Zahlungsmittel hinterlegt' : 'Keine Zahlungsdaten'}</span>
                 {payStatus ? <span className="pill info">Status: {payStatus}</span> : null}
@@ -519,7 +540,7 @@ export default function OrdersPage() {
                 {expanded ? "🔼 Zuklappen" : "🔎 Details"}
               </button>
               {canCharge ? (
-                <button type="button" className="mini-btn primary" onClick={onCharge}>299 € abbuchen</button>
+                <button type="button" className="mini-btn primary" onClick={onCharge}>{formatEUR(chargeAmountCents/100)} abbuchen</button>
               ) : null}
               {me?.role === "ADMIN" && (
                 <StatusControl
@@ -670,6 +691,13 @@ export default function OrdersPage() {
                 <div className="detail-value">
                   <div>Rep: {row?.rep_code || "—"}</div>
                   <div>Optionen gewählt: {formatInt(row?.option_chosen_count)}</div>
+                  {isReferral ? (
+                    <>
+                      <div>Promo: Empfehlung</div>
+                      <div>Promo-Code: {row?.referral_code ? String(row.referral_code).toUpperCase() : "—"}</div>
+                    </>
+                  ) : null}
+                  {row?.referral_award_status ? <div>Gutschein: {row.referral_award_status === 'awarded' ? 'versendet' : row.referral_award_status === 'pending' ? 'offen' : row.referral_award_status}</div> : null}
                 </div>
               </div>
 
@@ -717,18 +745,20 @@ export default function OrdersPage() {
           .summary-info { min-width:0; }
           .summary-headline { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
           h3 { font-size: 18px; font-weight: 800; margin: 0; }
-          .status-tag { display:inline-flex; align-items:center; height: 26px; padding: 0 10px; border-radius: 999px; font-weight: 800; font-size: 12px; letter-spacing: .2px; border:1px solid rgba(0,0,0,.06); }
-          .tag-default { background:#f8fafc; color:#0f172a; }
-          .tag-active { background:#f1f0ff; color:#4c1d95; border-color: rgba(107,33,168,.22); }
-          .tag-paid { background:#eef7ff; color:#0b6cf2; border-color: rgba(11,108,242,.22); }
-          .tag-done { background:#ecfdf5; color:#065f46; border-color: rgba(5,150,105,.28); }
-          .tag-progress { background:#fff7ed; color:#9a3412; border-color: rgba(251, 146, 60, .35); }
+        .status-tag { display:inline-flex; align-items:center; height: 26px; padding: 0 10px; border-radius: 999px; font-weight: 800; font-size: 12px; letter-spacing: .2px; border:1px solid rgba(0,0,0,.06); }
+        .tag-default { background:#f8fafc; color:#0f172a; }
+        .tag-active { background:#f1f0ff; color:#4c1d95; border-color: rgba(107,33,168,.22); }
+        .tag-paid { background:#eef7ff; color:#0b6cf2; border-color: rgba(11,108,242,.22); }
+        .tag-done { background:#ecfdf5; color:#065f46; border-color: rgba(5,150,105,.28); }
+        .tag-progress { background:#fff7ed; color:#9a3412; border-color: rgba(251, 146, 60, .35); }
           .tag-wait { background:#fef3c7; color:#92400e; border-color: rgba(245, 158, 11, .35); }
           .summary-address { color:#475569; margin: 2px 0 0; font-size: 14px; }
           .summary-meta { display:flex; flex-wrap:wrap; gap: 8px 14px; margin: 6px 0 0; color:#64748b; font-size: 13px; }
           .pay-line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px }
+          .ref-line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px }
           .pill { display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; font-size:12px; font-weight:800; border:1px solid #e5e7eb; background:#fff; color:#334155 }
           .pill.ok { border-color:#16a34a33; background:#ecfdf5; color:#065f46 }
+          .pill.promo { border-color:#16a34a33; background:#f0fdf4; color:#047857 }
           .pill.warn { border-color:#f59e0b33; background:#fffbeb; color:#92400e }
           .pill.info { border-color:#0b6cf233; background:#eef5ff; color:#0b6cf2 }
           .summary-actions { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -890,6 +920,14 @@ export default function OrdersPage() {
               </select>
             </div>
           )}
+          <button
+            type="button"
+            className={`chip ${promoOnly ? 'on' : ''}`}
+            onClick={() => setPromoOnly((v) => !v)}
+            title="Nur Aufträge mit Promo/Rabatt zeigen"
+          >
+            🎉 Nur Promo
+          </button>
           <div className="search">
             <input
               type="search"

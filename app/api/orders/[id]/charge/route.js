@@ -26,7 +26,7 @@ export async function POST(req, { params }) {
     const admin = supabaseAdmin();
     const { data: order, error: getErr } = await admin
       .from("orders")
-      .select("id, email, stripe_customer_id, stripe_payment_method_id, payment_method_type, payment_status")
+      .select("id, email, stripe_customer_id, stripe_payment_method_id, payment_method_type, payment_status, referral_code, discount_cents, total_cents")
       .eq("id", orderId)
       .maybeSingle();
     if (getErr) return NextResponse.json({ error: getErr.message }, { status: 400 });
@@ -43,7 +43,12 @@ export async function POST(req, { params }) {
     const { default: Stripe } = await import("stripe");
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-    const amount = 29900; // 299 EUR in cents
+    const base = 29900; // 299 EUR in cents
+    const discount = Math.max(0, Number(order?.discount_cents || 0));
+    const defaultAmount = Math.max(0, base - discount);
+    const amount = Number.isFinite(Number(order?.total_cents)) && Number(order.total_cents) > 0
+      ? Number(order.total_cents)
+      : defaultAmount;
     const currency = "eur";
 
     const pi = await stripe.paymentIntents.create({
@@ -54,7 +59,7 @@ export async function POST(req, { params }) {
       off_session: true,
       confirm: true,
       receipt_email: order.email || undefined,
-      metadata: { order_id: orderId },
+      metadata: { order_id: orderId, referral_code: order.referral_code || undefined },
     });
 
     // update order status accordingly
@@ -88,4 +93,3 @@ export async function POST(req, { params }) {
     return NextResponse.json({ error: e?.message || "Charge error" }, { status: 400 });
   }
 }
-

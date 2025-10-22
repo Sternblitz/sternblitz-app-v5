@@ -45,7 +45,7 @@ export async function GET(_req, { params }) {
     const admin = supabaseAdmin();
     const { data, error } = await admin
       .from("orders")
-      .select("id, email, first_name, last_name, company")
+      .select("id, email, first_name, last_name, company, discount_cents, total_cents, referral_code, referral_channel")
       .eq("id", id)
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });

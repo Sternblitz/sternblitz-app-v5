@@ -57,7 +57,21 @@ export async function POST(req) {
         };
         try { update.payment_receipt_url = pi.charges?.data?.[0]?.receipt_url || null; } catch {}
         if (orderId) {
+          // set paid
           await admin.from("orders").update(update).eq("id", orderId);
+          // referral bookkeeping: mark award pending and increment uses_count once
+          try {
+            const { data: ord } = await admin
+              .from("orders")
+              .select("referral_code, referral_award_status")
+              .eq("id", orderId)
+              .maybeSingle();
+            const code = ord?.referral_code || null;
+            if (code && !ord?.referral_award_status) {
+              await admin.from("orders").update({ referral_award_status: "pending" }).eq("id", orderId);
+              // TODO: optional increment referral_codes.uses_count via DB function if needed
+            }
+          } catch {}
         }
         break;
       }

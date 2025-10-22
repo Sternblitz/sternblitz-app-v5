@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 
 export default function LiveSimulator() {
@@ -9,6 +9,28 @@ export default function LiveSimulator() {
   const [data, setData] = useState(null); // { averageRating, totalReviews, breakdown }
   const [error, setError] = useState("");
   const [activeOpt, setActiveOpt] = useState("123"); // "123" | "12" | "1"
+  const [promo, setPromo] = useState({ code: null, discount: 0 });
+
+  useEffect(() => {
+    try {
+      let code = null;
+      let discount = 0;
+      try {
+        const storedCode = sessionStorage.getItem("sb_ref_code");
+        if (storedCode) code = storedCode;
+        const storedDiscount = sessionStorage.getItem("sb_ref_discount");
+        if (storedDiscount) discount = Number(storedDiscount) || 0;
+      } catch {}
+      if (typeof document !== "undefined" && !code) {
+        const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+        if (match) code = decodeURIComponent(match[1]);
+      }
+      if (code) {
+        if (!discount) discount = 2500;
+        setPromo({ code: code.toUpperCase(), discount });
+      }
+    } catch {}
+  }, []);
 
   // ---------- Google Places ----------
   const onGoogleLoad = () => {
@@ -281,7 +303,15 @@ export default function LiveSimulator() {
             <span className="option-title">1–3 ⭐ löschen</span>
             <div className="option-sub">
               <div>Entfernte: {c123.toLocaleString()}</div>
-              <div>Pauschal 299€</div>
+              <div>
+                {promo.discount ? (
+                  <>
+                    <span className="old">299 €</span> <span className="arrow">→</span> <span className="new">{((29900 - promo.discount)/100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                  </>
+                ) : (
+                  <span>pauschal 299 €</span>
+                )}
+              </div>
             </div>
           </button>
 
@@ -293,7 +323,15 @@ export default function LiveSimulator() {
             <span className="option-title">1–2 ⭐ löschen</span>
             <div className="option-sub">
               <div>Entfernte: {c12.toLocaleString()}</div>
-              <div>Pauschal 299€</div>
+              <div>
+                {promo.discount ? (
+                  <>
+                    <span className="old">299 €</span> <span className="arrow">→</span> <span className="new">{((29900 - promo.discount)/100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                  </>
+                ) : (
+                  <span>pauschal 299 €</span>
+                )}
+              </div>
             </div>
           </button>
 
@@ -305,7 +343,15 @@ export default function LiveSimulator() {
             <span className="option-title">1 ⭐ löschen</span>
             <div className="option-sub">
               <div>Entfernte: {c1.toLocaleString()}</div>
-              <div>Pauschal 299€</div>
+              <div>
+                {promo.discount ? (
+                  <>
+                    <span className="old">299 €</span> <span className="arrow">→</span> <span className="new">{((29900 - promo.discount)/100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                  </>
+                ) : (
+                  <span>pauschal 299 €</span>
+                )}
+              </div>
             </div>
           </button>
         </div>
@@ -412,6 +458,9 @@ export default function LiveSimulator() {
         .option-sub{margin-top:2px;font-family:Poppins;color:#1a1a1a;line-height:1.35}
         .option-sub div:first-child{font-size:15px;font-weight:800;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:2px;text-decoration-color:rgba(73,168,76,.55)}
         .option-sub div:last-child{font-size:12.5px;font-weight:600;color:rgba(0,0,0,.62);letter-spacing:.1px}
+        .option-sub .old{text-decoration:line-through;color:#64748b}
+        .option-sub .arrow{color:#0b6cf2;font-weight:900;margin:0 4px}
+        .option-sub .new{color:#0f172a;font-weight:900}
 
         /* ---------- Responsive ---------- */
         @media (max-width:991px){

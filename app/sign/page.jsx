@@ -43,6 +43,7 @@ export default function SignPage() {
     phone: "",
   });
   const [profileSource, setProfileSource] = useState({ name: "", address: "" });
+  const [promoInfo, setPromoInfo] = useState({ code: null, discount: 0 });
 
   // ===== Helpers =====
   const optionLabel = (opt) =>
@@ -90,6 +91,28 @@ export default function SignPage() {
           address: src?.address || "",
         });
       } catch {}
+    } catch {}
+  }, []);
+
+  // ===== Promo/Referral Info aus Session/Cookie laden =====
+  useEffect(() => {
+    try {
+      let code = null;
+      let discount = 0;
+      try {
+        const storedCode = sessionStorage.getItem("sb_ref_code");
+        if (storedCode) code = storedCode;
+        const storedDiscount = sessionStorage.getItem("sb_ref_discount");
+        if (storedDiscount) discount = Number(storedDiscount) || 0;
+      } catch {}
+      if (typeof document !== "undefined") {
+        const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+        if (!code && match) code = decodeURIComponent(match[1]);
+      }
+      if (code) {
+        if (!discount) discount = 2500;
+        setPromoInfo({ code: code.toUpperCase(), discount });
+      }
     } catch {}
   }, []);
 
@@ -252,6 +275,16 @@ export default function SignPage() {
         repCode = sessionStorage.getItem("sb_rep_code") || null;
       } catch {}
 
+      // Referral Code aus Cookie/Session
+      let referralCode = null;
+      try {
+        referralCode = sessionStorage.getItem('sb_ref_code') || null;
+        if (!referralCode && typeof document !== 'undefined') {
+          const m = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+          referralCode = m ? decodeURIComponent(m[1]) : null;
+        }
+      } catch {}
+
       const res = await fetch("/api/sign/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -270,6 +303,7 @@ export default function SignPage() {
           statsSource: profileSource,
           rep_code: repCode,             // neu
           source_account_id: sourceAccountId, // neu
+          referralCode,
         }),
       });
 
@@ -278,6 +312,14 @@ export default function SignPage() {
 
       alert("Auftragsbestätigung erstellt.");
       try { sessionStorage.setItem('sb_order_id', json?.orderId || ''); } catch(_) {}
+      try {
+        if (json?.referralCode) {
+          sessionStorage.setItem('sb_ref_my_code', json.referralCode);
+        }
+        if (typeof json?.discountCents === 'number') {
+          sessionStorage.setItem('sb_ref_discount', String(json.discountCents));
+        }
+      } catch {}
       // Direkt zur Zahlungsseite weiterleiten (Karte/SEPA hinterlegen)
       try { window.location.assign('/sign/payment'); } catch(_) {}
     } catch (e) {
@@ -292,6 +334,11 @@ export default function SignPage() {
   const chosenLabel = optionLabel(summary.selectedOption);
   const chosenCount = optionCount(summary.selectedOption, summary.counts);
   const countText = fmtCount(chosenCount);
+  const basePriceCents = 29900;
+  const discountCents = promoInfo.discount || 0;
+  const finalPriceCents = Math.max(0, basePriceCents - discountCents);
+  const basePriceFormatted = (basePriceCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  const finalPriceFormatted = (finalPriceCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 
   return (
     <main className="shell">
@@ -318,7 +365,16 @@ export default function SignPage() {
           <div className="bullets">
             <div className="bullet">
               <span className="tick">✅</span>
-              <span>Fixpreis: <b>299 €</b> (einmalig)</span>
+              <span>
+                Fixpreis: {promoInfo.code ? (
+                  <b>
+                    <span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span>
+                  </b>
+                ) : (
+                  <b>{basePriceFormatted}</b>
+                )}
+                {promoInfo.code ? <span className="promo-note"> (Promo aktiv)</span> : " (einmalig)"}
+              </span>
             </div>
             <div className="bullet">
               <span className="tick">✅</span>
@@ -330,6 +386,14 @@ export default function SignPage() {
             </div>
           </div>
         </section>
+
+        {promoInfo.code ? (
+          <section className="promo-banner">
+            <div className="promo-line">🎉 Promo aktiv: {promoInfo.code}</div>
+            <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
+            <div className="promo-sub">Dein Rabatt wird automatisch berücksichtigt.</div>
+          </section>
+        ) : null}
 
         {/* GRID: Profil + Option */}
         <section className="grid-2">
@@ -607,6 +671,14 @@ export default function SignPage() {
           box-shadow: var(--shadow-soft);
           text-align:left;
         }
+        .promo-note{font-size:12px;color:#0b6cf2;margin-left:6px;font-weight:800}
+        .promo-banner{margin:16px auto 0;max-width:760px;padding:14px;border-radius:16px;border:1px solid rgba(11,108,242,.22);background:linear-gradient(90deg,rgba(11,108,242,.12),rgba(59,130,246,.06));display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+        .promo-line{font-weight:900;color:#0b6cf2;font-size:16px}
+        .promo-amount{font-weight:900;font-size:18px;color:#0f172a}
+        .promo-sub{font-size:12.5px;color:#475569}
+        .old{text-decoration:line-through;color:#64748b}
+        .arrow{color:#0b6cf2;font-weight:900;margin:0 4px}
+        .new{color:#0f172a;font-weight:900}
         .tick{font-size:16px;line-height:1.2}
         .grid-2{
           display:grid;

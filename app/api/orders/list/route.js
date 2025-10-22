@@ -103,7 +103,15 @@ export async function GET(req) {
         payment_last_event,
         charged_amount,
         charge_currency,
-        charged_at
+        charged_at,
+        referral_code,
+        referral_channel,
+        referral_referrer_order_id,
+        discount_cents,
+        total_cents,
+        referral_award_status,
+        referral_award_value_cents,
+        referral_awarded_at
       `)
       .order("created_at", { ascending: false })
       .limit(200);

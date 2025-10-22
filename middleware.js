@@ -5,8 +5,8 @@ export async function middleware(req) {
   const res = NextResponse.next();
   const { pathname } = req.nextUrl;
 
-  // Nur /dashboard und /sign schützen
-  const protectedPaths = ["/dashboard", "/sign"];
+  // Nur /dashboard schützen (Sign ist öffentlich für Referral-Fluss)
+  const protectedPaths = ["/dashboard"];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (!isProtected) {
@@ -31,5 +31,5 @@ export async function middleware(req) {
 
 // Middleware greift nur auf Dashboard und Sign
 export const config = {
-  matcher: ["/dashboard/:path*", "/sign"],
+  matcher: ["/dashboard/:path*"],
 };
