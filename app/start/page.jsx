@@ -42,6 +42,7 @@ export default function StartPage() {
   });
   const [editContact, setEditContact] = useState(false);
   const [warn, setWarn] = useState("");
+  const [errors, setErrors] = useState({});
   const canProceed = (() => {
     const okNames = (contact.firstName || "").trim().length >= 2 && (contact.lastName || "").trim().length >= 2;
     const okEmail = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((contact.email || "").trim());
@@ -349,7 +350,7 @@ export default function StartPage() {
             <div id="start-contact" className="lead-form">
               <div className="group">
                 <div className="group-title">Google‑Profil</div>
-                {warn && !googleProfile ? <div className="warn">{warn}</div> : null}
+                {errors.googleProfile ? <div className="err-msg">{errors.googleProfile}</div> : null}
                 <div className="field">
                   <label>Profil</label>
                   <div className="input-row">
@@ -390,7 +391,7 @@ export default function StartPage() {
               </div>
               <div className="group">
                 <div className="group-title">Zu löschende Bewertungen</div>
-                {warn && !selectedOption ? <div className="warn">{warn}</div> : null}
+                {errors.selectedOption ? <div className="err-msg">{errors.selectedOption}</div> : null}
                 <div className="seg-options">
                   {[
                     { v: '123', label: '1–3 ⭐ löschen' },
@@ -415,29 +416,55 @@ export default function StartPage() {
               </div>
               <div className="group">
                 <div className="group-title">Kontaktdaten</div>
-                {warn ? <div className="warn">{warn}</div> : null}
                 <div className="field">
                   <label>Firma</label>
-                  <input type="text" placeholder="Firma GmbH" value={contact.company} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, company: v })); updateCheckoutPartial({ company: v }); }} />
+                  <input type="text" placeholder="Firma GmbH" value={contact.company} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, company: v })); updateCheckoutPartial({ company: v }); setErrors((er) => ({ ...er, company: v.trim().length >= 2 ? null : 'Bitte Firma angeben' })); }} />
+                  {errors.company ? <div className="err-msg">{errors.company}</div> : null}
                 </div>
                 <div className="row">
                   <div className="field half">
                     <label>Vorname <span className="req">*</span></label>
-                    <input name="firstName" type="text" placeholder="Max" value={contact.firstName} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, firstName: v })); updateCheckoutPartial({ firstName: v }); }} />
+                    <input name="firstName" type="text" placeholder="Max" value={contact.firstName} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, firstName: v })); updateCheckoutPartial({ firstName: v }); setErrors((er) => ({ ...er, firstName: v.trim().length >= 2 ? null : 'Bitte Vorname (min. 2 Zeichen)' })); }} />
+                    {errors.firstName ? <div className="err-msg">{errors.firstName}</div> : null}
                   </div>
                   <div className="field half">
                     <label>Nachname <span className="req">*</span></label>
-                    <input type="text" placeholder="Mustermann" value={contact.lastName} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, lastName: v })); updateCheckoutPartial({ lastName: v }); }} />
+                    <input type="text" placeholder="Mustermann" value={contact.lastName} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, lastName: v })); updateCheckoutPartial({ lastName: v }); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
+                    {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
                   </div>
                 </div>
                 <div className="row">
                   <div className="field half">
                     <label>E‑Mail <span className="req">*</span></label>
-                    <input type="email" placeholder="max@firma.de" value={contact.email} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, email: v })); updateCheckoutPartial({ email: v }); }} />
+                    <input type="email" placeholder="max@firma.de" value={contact.email} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, email: v })); updateCheckoutPartial({ email: v }); setErrors((er) => ({ ...er, email: /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v||'').trim()) ? null : 'Bitte gültige E‑Mail angeben' })); }} />
+                    {errors.email ? <div className="err-msg">{errors.email}</div> : null}
                   </div>
                   <div className="field half">
                     <label>Telefon</label>
-                    <input type="tel" placeholder="0151 2345678" value={contact.phone} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, phone: v })); updateCheckoutPartial({ phone: v }); }} />
+                    <input type="tel" placeholder="+49 151 2345678" value={contact.phone} onChange={(e) => {
+                      let v = e.target.value;
+                      v = v.replace(/[^\d+\s]/g, '');
+                      if (!v.startsWith('+')) {
+                        const digits = v.replace(/\D/g, '');
+                        if (digits.startsWith('0')) v = '+49 ' + digits.replace(/^0+/, '');
+                        else if (digits) v = '+49 ' + digits;
+                        else v = '+49 ';
+                      }
+                      setContact((c) => ({ ...c, phone: v }));
+                      updateCheckoutPartial({ phone: v });
+                      const ok = String(v || '').replace(/\D/g, '').length >= 6;
+                      setErrors((er) => ({ ...er, phone: ok ? null : 'Bitte gültige Telefonnummer angeben' }));
+                    }} onBlur={(e) => {
+                      let v = e.target.value || '';
+                      if (!v.trim()) return;
+                      if (!v.startsWith('+')) {
+                        const digits = v.replace(/\D/g, '');
+                        v = '+49 ' + digits.replace(/^0+/, '');
+                      }
+                      setContact((c) => ({ ...c, phone: v }));
+                      updateCheckoutPartial({ phone: v });
+                    }} />
+                    {errors.phone ? <div className="err-msg">{errors.phone}</div> : null}
                   </div>
                 </div>
                 <div className="actions">
@@ -497,6 +524,7 @@ export default function StartPage() {
         .btn.ghost{border:1px solid #cbd5e1;background:#fff}
         .btn.solid{border:1px solid #0b6cf2;background:#0b6cf2;color:#fff}
         .warn{border:1px solid #ef444433;background:#fee2e2;color:#991b1b;padding:8px 10px;border-radius:10px;font-weight:800}
+        .err-msg{color:#b91c1c;font-size:12px;margin-top:4px}
         .icon-btn{border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:10px;min-width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.06)}
         .cta{display:flex;justify-content:center;margin-top:12px}
         .confirm{height:42px;border-radius:999px;border:1px solid #16a34a;background:#22c55e;color:#fff;font-weight:900;padding:0 18px}

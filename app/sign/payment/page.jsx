@@ -102,6 +102,7 @@ export default function PaymentPage() {
   const [editBilling, setEditBilling] = useState(false);
   const [billingDraft, setBillingDraft] = useState(null);
   const [showAddress, setShowAddress] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
   const [redeemTried, setRedeemTried] = useState(false);
 
   useEffect(() => {
@@ -125,6 +126,7 @@ export default function PaymentPage() {
             billing_name: name || b.billing_name,
             billing_company: company || b.billing_company,
           }));
+          if (email) setShowEmail(true);
         } catch {}
         try { order_id = sessionStorage.getItem("sb_order_id") || null; } catch {}
         try {
@@ -145,6 +147,7 @@ export default function PaymentPage() {
                 billing_name: nm || b.billing_name,
                 billing_company: company || b.billing_company,
               }));
+              if (email) setShowEmail(true);
               if (j.order.discount_cents) {
                 setPromoInfo({ code: (j.order.referral_code || "").toUpperCase(), discount: j.order.discount_cents });
               }
@@ -327,7 +330,7 @@ export default function PaymentPage() {
           <div className="bill-box">
             <div><b>Name:</b> {billing.billing_name || "—"}</div>
             <div><b>Firma:</b> {billing.billing_company || "—"}</div>
-            <div><b>E‑Mail:</b> {billing.billing_email || "—"}</div>
+            {billing.billing_email ? (<div><b>E‑Mail:</b> {billing.billing_email}</div>) : null}
             <div>
               <b>Adresse:</b>{" "}
               {billing.billing_line1 || billing.billing_city || billing.billing_postal_code ? (
@@ -338,7 +341,7 @@ export default function PaymentPage() {
                 "—"
               )}
             </div>
-          </div>
+            </div>
         ) : (
           <>
             <div className="billing-grid bill-box">
@@ -358,16 +361,23 @@ export default function PaymentPage() {
                   placeholder="Firma GmbH"
                 />
               </label>
-              <label>
-                <span>E‑Mail</span>
-                <input
-                  type="email"
-                  value={billingDraft?.billing_email || ""}
-                  onChange={(e) => setBillingDraft((v) => ({ ...v, billing_email: e.target.value }))}
-                  placeholder="max@firma.de"
-                />
-              </label>
+              {showEmail ? (
+                <label>
+                  <span>E‑Mail (optional – für Belege & schnelleren Checkout)</span>
+                  <input
+                    type="email"
+                    value={billingDraft?.billing_email || ""}
+                    onChange={(e) => setBillingDraft((v) => ({ ...v, billing_email: e.target.value }))}
+                    placeholder="max@firma.de"
+                  />
+                </label>
+              ) : null}
             </div>
+            {!showEmail ? (
+              <button type="button" className="mini-btn add" onClick={() => setShowEmail(true)}>
+                + E‑Mail hinterlegen (optional)
+              </button>
+            ) : null}
             {!showAddress ? (
               <button type="button" className="mini-btn add" onClick={() => setShowAddress(true)}>
                 + Adresse hinzufügen (optional)
@@ -494,6 +504,7 @@ export default function PaymentPage() {
           <PaymentForm orderId={orderId} billing={billing} />
         </Elements>
         <div className="hint">Die Angaben dienen der Rechnung &amp; Stripe-Verifizierung. Zahlung erfolgt erst nach Erfolg.</div>
+        <div className="hint small">Hinweis: E‑Mail ist optional. Hinterlegte E‑Mail erleichtert Belege und Bestätigungen.</div>
       </section>
 
       <style jsx>{`
@@ -512,6 +523,7 @@ export default function PaymentPage() {
         label span{font-size:12px;color:#64748b;font-weight:800}
         input,select{height:36px;border-radius:10px;border:1px solid #e5e7eb;padding:6px 10px;font-size:14px}
         .mini-btn.add{height:34px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;font-weight:800}
+        .hint.small{font-size:12px;color:#94a3b8}
         .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:10px}
         .btn{border-radius:10px;height:34px;padding:0 12px;font-weight:900;letter-spacing:.2px;cursor:pointer}
         .btn.ghost{border:1px solid #cbd5e1;background:#fff}

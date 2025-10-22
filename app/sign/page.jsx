@@ -8,6 +8,8 @@ import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
 export const dynamic = "force-dynamic";
 
 export default function SignPage() {
+  const AGB_URL = process.env.NEXT_PUBLIC_AGB_URL || "/AGB.pdf";
+  const PRIVACY_URL = process.env.NEXT_PUBLIC_PRIVACY_URL || "/Datenschutz.pdf";
   // ===== Canvas (Signatur) =====
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -45,6 +47,7 @@ export default function SignPage() {
   });
   const [profileSource, setProfileSource] = useState({ name: "", address: "" });
   const [promoInfo, setPromoInfo] = useState({ code: null, discount: 0 });
+  const [errors, setErrors] = useState({});
 
   // ===== Helpers =====
   const optionLabel = (opt) =>
@@ -292,6 +295,23 @@ export default function SignPage() {
 
   // ===== Submit (PDF erzeugen + API call) =====
   const submit = async () => {
+    // Inline Feld-Validierung (Kontakt)
+    const errs = {};
+    const emailOk = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((summary.email || '').trim());
+    const phoneDigits = String(summary.phone || '').replace(/\D/g, '');
+    if (!(summary.company || '').trim() || (summary.company || '').trim().length < 2) errs.company = 'Bitte Firma angeben';
+    if (!(summary.firstName || '').trim() || (summary.firstName || '').trim().length < 2) errs.firstName = 'Bitte Vorname (min. 2 Zeichen)';
+    if (!(summary.lastName || '').trim() || (summary.lastName || '').trim().length < 2) errs.lastName = 'Bitte Nachname (min. 2 Zeichen)';
+    if (!emailOk) errs.email = 'Bitte gültige E‑Mail angeben';
+    if (phoneDigits.length < 6) errs.phone = 'Bitte gültige Telefonnummer angeben';
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      setEditContact(true);
+      try {
+        document.querySelector('.with-bar.yellow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch {}
+      return;
+    }
     if (!agree) {
       alert("Bitte AGB & Datenschutz bestätigen.");
       return;
@@ -589,11 +609,26 @@ export default function SignPage() {
         ) : (
           <>
             <div className="contact-grid">
-              <label><span>Firma</span><input value={contactDraft.company} onChange={(e) => setContactDraft((d) => ({ ...d, company: e.target.value }))} /></label>
-              <label><span>Vorname</span><input value={contactDraft.firstName} onChange={(e) => setContactDraft((d) => ({ ...d, firstName: e.target.value }))} /></label>
-              <label><span>Nachname</span><input value={contactDraft.lastName} onChange={(e) => setContactDraft((d) => ({ ...d, lastName: e.target.value }))} /></label>
-              <label><span>E-Mail</span><input type="email" value={contactDraft.email} onChange={(e) => setContactDraft((d) => ({ ...d, email: e.target.value }))} /></label>
-              <label><span>Telefon</span><input value={contactDraft.phone} onChange={(e) => setContactDraft((d) => ({ ...d, phone: e.target.value }))} /></label>
+              <label><span>Firma</span>
+                <input value={contactDraft.company} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, company: v })); setErrors((er) => ({ ...er, company: v.trim().length >= 2 ? null : 'Bitte Firma angeben' })); }} />
+                {errors.company ? <div className="err-msg">{errors.company}</div> : null}
+              </label>
+              <label><span>Vorname</span>
+                <input value={contactDraft.firstName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, firstName: v })); setErrors((er) => ({ ...er, firstName: v.trim().length >= 2 ? null : 'Bitte Vorname (min. 2 Zeichen)' })); }} />
+                {errors.firstName ? <div className="err-msg">{errors.firstName}</div> : null}
+              </label>
+              <label><span>Nachname</span>
+                <input value={contactDraft.lastName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, lastName: v })); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
+                {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
+              </label>
+              <label><span>E-Mail</span>
+                <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v||'').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
+                {errors.email ? <div className="err-msg">{errors.email}</div> : null}
+              </label>
+              <label><span>Telefon</span>
+                <input value={contactDraft.phone} placeholder="+49 151 2345678" onChange={(e) => { let v = e.target.value; v = v.replace(/[^\d+\s]/g, ''); if (!v.startsWith('+')) { const digits = v.replace(/\D/g, ''); if (digits.startsWith('0')) v = '+49 ' + digits.replace(/^0+/, ''); else if (digits) v = '+49 ' + digits; else v = '+49 '; } setContactDraft((d) => ({ ...d, phone: v })); const ok = String(v || '').replace(/\D/g, '').length >= 6; setErrors((er) => ({ ...er, phone: ok ? null : 'Bitte gültige Telefonnummer angeben' })); }} />
+                {errors.phone ? <div className="err-msg">{errors.phone}</div> : null}
+              </label>
             </div>
             <div className="row-actions">
               <button className="btn ghost" type="button" onClick={() => setEditContact(false)}>Abbrechen</button>
@@ -628,9 +663,9 @@ export default function SignPage() {
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
           <span>
             Ich stimme den{" "}
-            <a href="/AGB.pdf" target="_blank" rel="noopener noreferrer">AGB</a>{" "}
+            <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
             und den{" "}
-            <a href="/Datenschutz.pdf" target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
+            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
             zu.
           </span>
         </label>
@@ -804,6 +839,7 @@ export default function SignPage() {
         .contact-grid.readonly{grid-template-columns:repeat(3, minmax(0,1fr))}
         .contact-grid label{display:flex;flex-direction:column;gap:6px}
         .contact-grid label input{height:34px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:6px 10px}
+        .err-msg{color:#b91c1c;font-size:12px;margin-top:2px}
         .contact-grid span{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.04em}
         .signature{padding:12px 16px 20px}
         .sig-head{display:flex;justify-content:space-between;align-items:center;padding:4px 2px 8px}

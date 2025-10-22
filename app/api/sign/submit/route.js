@@ -237,6 +237,21 @@ async function buildPdf(p, sigBytes, priceInfo = {}) {
     y -= 14;
   }
 
+  // Rechtlicher Hinweis (über der Unterschrift)
+  y -= 8;
+  draw("Rechtlicher Hinweis:", { x: 50, y, font: bold, size: 10, color: rgb(0,0,0) });
+  y -= 14;
+  draw(
+    "Mit meiner Unterschrift bestätige ich, die AGB und die Datenschutzerklärung gelesen und akzeptiert zu haben.",
+    { x: 50, y, font, size: 10, color: rgb(0,0,0) }
+  );
+  y -= 14;
+  draw(
+    "Hinweis: Beide Dokumente sind der Bestätigungs-E-Mail als AGB.pdf und Datenschutzbestimmungen.pdf angehängt.",
+    { x: 50, y, font, size: 10, color: rgb(0,0,0) }
+  );
+  y -= 12;
+
   y -= 12;
   draw("Unterschrift:", { x: 50, y, font: bold, size: 11, color: rgb(0,0,0) });
   y -= 100;
@@ -580,6 +595,8 @@ export async function POST(req) {
           </div>
         `
       : `
+          ${appliedDiscount && usedPromoCode ? `<div style="display:inline-flex;align-items:center;gap:8px;border:1px solid #bbf7d0;background:#f0fdf4;color:#065f46;border-radius:999px;padding:6px 10px;font-weight:800;margin:4px 0 10px">🎉 Promo‑Code angewendet: ${usedPromoCode}</div>` : ''}
+
           <div style="border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px;margin:12px 0;background:#ffffff">
             <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Fixpreis</div>
             <div style="font-weight:700">${fmtEUR(BASE_PRICE_CENTS)} (einmalig)</div>
@@ -646,6 +663,7 @@ export async function POST(req) {
       `Danke für deinen Auftrag. Wir starten jetzt mit der Entfernung der ausgewählten Bewertungen.\n\n` +
       `Google-Profil: ${normalizedGoogleProfile || "—"}\n` +
       `Auswahl: ${chosenLabel} → ${Number.isFinite(selectedCount) ? selectedCount : "—"} Stück\n` +
+      `${appliedDiscount && usedPromoCode ? `Promo-Code angewendet: ${usedPromoCode}\n` : ''}` +
       `${priceText}\n\n` +
       `${pdfLine}\n\n` +
       `Freunde werben & sparen:\n` +
@@ -659,6 +677,30 @@ export async function POST(req) {
 
     if (process.env.RESEND_API_KEY && isValidFromOrReplyTo(process.env.RESEND_FROM || "")) {
       if (email) {
+        // Build attachments: contract PDF (optional) + legal PDFs (AGB, Datenschutz)
+        const attachments = [];
+        if (ATTACH) {
+          attachments.push({
+            filename: fileName,
+            content: Buffer.from(pdfBytes),
+            contentType: "application/pdf",
+          });
+        }
+        // Try to attach AGB and Datenschutz as requested
+        const AGB_URL = process.env.NEXT_PUBLIC_AGB_URL || process.env.AGB_URL || null;
+        const PRIVACY_URL = process.env.NEXT_PUBLIC_PRIVACY_URL || process.env.PRIVACY_URL || null;
+        const tryAttachFromUrl = async (url, outName) => {
+          if (!url) return;
+          try {
+            const res = await fetch(url, { method: 'GET' });
+            if (!res.ok) return;
+            const ab = await res.arrayBuffer();
+            attachments.push({ filename: outName, content: Buffer.from(ab), contentType: 'application/pdf' });
+          } catch {}
+        };
+        await tryAttachFromUrl(AGB_URL, 'AGB.pdf');
+        await tryAttachFromUrl(PRIVACY_URL, 'Datenschutzbestimmungen.pdf');
+
         const payload = {
           from: process.env.RESEND_FROM,
           to: email,
@@ -667,13 +709,7 @@ export async function POST(req) {
           text,
           headers: { "X-Entity-Ref-ID": key },
           ...(isValidFromOrReplyTo(process.env.RESEND_REPLY_TO || "") ? { reply_to: process.env.RESEND_REPLY_TO } : {}),
-          ...(ATTACH ? {
-            attachments: [{
-              filename: fileName,
-              content: Buffer.from(pdfBytes),
-              contentType: "application/pdf",
-            }],
-          } : {}),
+          ...(attachments.length ? { attachments } : {}),
         };
         const { error: mailErr } = await resend.emails.send(payload);
         if (mailErr) console.warn("Resend error:", mailErr);
