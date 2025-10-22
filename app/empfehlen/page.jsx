@@ -123,9 +123,25 @@ export default function ReferralPage() {
         </form>
         {status ? <div className={status.ok ? "ok" : "err"}>{status.msg}</div> : null}
         <div className="hint">Der Rabatt gilt automatisch für die nächsten Schritte.</div>
-        <a className="primary" href="/start">
-          Jetzt starten
-        </a>
+        <button
+          className="primary"
+          type="button"
+          onClick={() => {
+            let ok = Boolean(status?.ok);
+            try { if (!ok) ok = Boolean(sessionStorage.getItem('sb_ref_code')); } catch {}
+            try {
+              if (!ok && typeof document !== 'undefined') {
+                const m = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+                if (m) ok = true;
+              }
+            } catch {}
+            if (!ok) {
+              alert('Bitte gültigen Promo‑Code eingeben und aktivieren.');
+              return;
+            }
+            try { window.location.assign('/start'); } catch {}
+          }}
+        >Jetzt starten</button>
       </section>
 
       {myCode && showMine ? (

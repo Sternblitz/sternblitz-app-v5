@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { supabase as supabaseClient } from "@/lib/supabaseClient";
 import Script from "next/script";
+import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
 
 export default function LiveSimulator() {
   const inputRef = useRef(null);
@@ -10,26 +12,38 @@ export default function LiveSimulator() {
   const [error, setError] = useState("");
   const [activeOpt, setActiveOpt] = useState("123"); // "123" | "12" | "1"
   const [promo, setPromo] = useState({ code: null, discount: 0 });
+  const prefilledOnce = useRef(false);
 
   useEffect(() => {
-    try {
-      let code = null;
-      let discount = 0;
+    (async () => {
       try {
-        const storedCode = sessionStorage.getItem("sb_ref_code");
-        if (storedCode) code = storedCode;
-        const storedDiscount = sessionStorage.getItem("sb_ref_discount");
-        if (storedDiscount) discount = Number(storedDiscount) || 0;
+        // If an internal user is logged in, suppress promo display entirely
+        const sb = supabaseClient();
+        const { data } = await sb.auth.getUser();
+        if (data?.user) {
+          setPromo({ code: null, discount: 0 });
+          return;
+        }
       } catch {}
-      if (typeof document !== "undefined" && !code) {
-        const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
-        if (match) code = decodeURIComponent(match[1]);
-      }
-      if (code) {
-        if (!discount) discount = 2500;
-        setPromo({ code: code.toUpperCase(), discount });
-      }
-    } catch {}
+      try {
+        let code = null;
+        let discount = 0;
+        try {
+          const storedCode = sessionStorage.getItem("sb_ref_code");
+          if (storedCode) code = storedCode;
+          const storedDiscount = sessionStorage.getItem("sb_ref_discount");
+          if (storedDiscount) discount = Number(storedDiscount) || 0;
+        } catch {}
+        if (typeof document !== "undefined" && !code) {
+          const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+          if (match) code = decodeURIComponent(match[1]);
+        }
+        if (code) {
+          if (!discount) discount = 2500;
+          setPromo({ code: code.toUpperCase(), discount });
+        }
+      } catch {}
+    })();
   }, []);
 
   // ---------- Google Places ----------
@@ -54,6 +68,9 @@ export default function LiveSimulator() {
         // Profil merken (Formular zieht es beim Klick auf „Jetzt loslegen“)
         try {
           sessionStorage.setItem("sb_selected_profile", JSON.stringify(sel));
+        } catch {}
+        try {
+          window.dispatchEvent(new CustomEvent("sb:profile", { detail: sel }));
         } catch {}
 
         // Input zeigt den gewählten Eintrag
@@ -131,6 +148,62 @@ export default function LiveSimulator() {
       setError(`Fehler: ${e.message || String(e)}`);
     }
   };
+
+  // ---------- Prefill from URL or sessionStorage ----------
+  useEffect(() => {
+    if (prefilledOnce.current) return;
+    prefilledOnce.current = true;
+    try {
+      // 1) From URL params
+      const u = new URL(window.location.href);
+      const gp = (u.searchParams.get('gp') || '').trim();
+      const name = (u.searchParams.get('name') || '').trim();
+      const address = (u.searchParams.get('address') || '').trim();
+      const url = (u.searchParams.get('url') || '').trim();
+      const opt = (u.searchParams.get('opt') || '').trim();
+
+      let finalName = '';
+      let finalAddress = '';
+      if (gp) {
+        const parts = gp.split(',');
+        finalName = (parts.shift() || '').trim();
+        finalAddress = parts.join(',').trim();
+      } else {
+        finalName = name;
+        finalAddress = address;
+      }
+
+      if (finalName) {
+        try {
+          sessionStorage.setItem('sb_selected_profile', JSON.stringify({ name: finalName, address: finalAddress || '', url }));
+        } catch {}
+        if (inputRef.current) {
+          inputRef.current.value = `${finalName}${finalAddress ? ", " + finalAddress : ''}`;
+        }
+        runFetch(finalName, finalAddress);
+      } else {
+        // 2) Fallback: From sessionStorage (if already set)
+        try {
+          const raw = sessionStorage.getItem('sb_selected_profile') || '';
+          if (raw) {
+            const sel = JSON.parse(raw);
+            const n = (sel?.name || '').trim();
+            const a = (sel?.address || '').trim();
+            if (n) {
+              if (inputRef.current) inputRef.current.value = `${n}${a ? ", " + a : ''}`;
+              runFetch(n, a);
+            }
+          }
+        } catch {}
+      }
+
+      // Option preselect
+      const pick = opt || (sessionStorage.getItem('sb_selected_option') || '');
+      if (pick && ["123","12","1"].includes(pick)) {
+        selectOption(pick);
+      }
+    } catch {}
+  }, []);
 
   // ENTER startet Suche (Fallback ohne Dropdown-Klick)
   const onKeyDown = (e) => {
@@ -211,6 +284,19 @@ export default function LiveSimulator() {
       window.dispatchEvent(new CustomEvent("sb:option-changed", { detail: opt }));
     } catch {}
   };
+
+  // Sync option from external sources (e.g., Start form)
+  useEffect(() => {
+    const onOpt = (e) => {
+      const opt = e?.detail;
+      if (opt && ["123","12","1"].includes(opt)) {
+        setActiveOpt(opt);
+        try { sessionStorage.setItem("sb_selected_option", opt); } catch {}
+      }
+    };
+    try { window.addEventListener("sb:option-changed", onOpt); } catch {}
+    return () => { try { window.removeEventListener("sb:option-changed", onOpt); } catch {} };
+  }, []);
 
   // ---------- Render ----------
   const Cards = () => {
@@ -306,10 +392,10 @@ export default function LiveSimulator() {
               <div>
                 {promo.discount ? (
                   <>
-                    <span className="old">299 €</span> <span className="arrow">→</span> <span className="new">{((29900 - promo.discount)/100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                    <span className="old">{formatEUR(BASE_PRICE_CENTS)}</span> <span className="arrow">→</span> <span className="new">{formatEUR(computeFinal(BASE_PRICE_CENTS, promo.discount))}</span>
                   </>
                 ) : (
-                  <span>pauschal 299 €</span>
+                  <span>Pauschal {formatEUR(BASE_PRICE_CENTS)}</span>
                 )}
               </div>
             </div>
@@ -326,10 +412,10 @@ export default function LiveSimulator() {
               <div>
                 {promo.discount ? (
                   <>
-                    <span className="old">299 €</span> <span className="arrow">→</span> <span className="new">{((29900 - promo.discount)/100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                    <span className="old">{formatEUR(BASE_PRICE_CENTS)}</span> <span className="arrow">→</span> <span className="new">{formatEUR(computeFinal(BASE_PRICE_CENTS, promo.discount))}</span>
                   </>
                 ) : (
-                  <span>pauschal 299 €</span>
+                  <span>Pauschal {formatEUR(BASE_PRICE_CENTS)}</span>
                 )}
               </div>
             </div>
@@ -346,10 +432,10 @@ export default function LiveSimulator() {
               <div>
                 {promo.discount ? (
                   <>
-                    <span className="old">299 €</span> <span className="arrow">→</span> <span className="new">{((29900 - promo.discount)/100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                    <span className="old">{formatEUR(BASE_PRICE_CENTS)}</span> <span className="arrow">→</span> <span className="new">{formatEUR(computeFinal(BASE_PRICE_CENTS, promo.discount))}</span>
                   </>
                 ) : (
-                  <span>pauschal 299 €</span>
+                  <span>Pauschal {formatEUR(BASE_PRICE_CENTS)}</span>
                 )}
               </div>
             </div>

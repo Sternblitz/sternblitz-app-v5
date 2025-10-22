@@ -3,20 +3,14 @@ import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { cookies } from "next/headers";
 import { Resend } from "resend";
+import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 
 export const runtime = "nodejs"; // Node, nicht Edge
 
-const BASE_PRICE_CENTS = 29900;
-
-const fmtEUR = (cents) =>
-  new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format((Number(cents) || 0) / 100);
+const fmtEUR = formatEUR;
 
 // ---------- Helpers ----------
 function dataUrlToUint8(signaturePng) {
@@ -321,10 +315,11 @@ export async function POST(req) {
       console.warn("sign/submit getUser error (ignoriere für Referral-Flow)", userError);
     }
 
+    let isInternalUser = false;
     if (user) {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("user_id")
+        .select("user_id, role")
         .eq("user_id", user.id)
         .maybeSingle();
       if (profileError) {
@@ -337,6 +332,7 @@ export async function POST(req) {
           { status: 403 }
         );
       }
+      isInternalUser = true; // jeder eingeloggte Nutzer gilt als intern; Rabatt daher gesperrt
       if (source_account_id && source_account_id !== user.id) {
         console.warn("source_account_id does not match session user", {
           source_account_id,
@@ -355,6 +351,8 @@ export async function POST(req) {
         if (cookieVal) normalizedReferralCode = String(cookieVal).trim().toUpperCase();
       } catch {}
     }
+    // Interne Nutzer: niemals Promo anwenden
+    if (isInternalUser) normalizedReferralCode = "";
     let referralMatch = null;
     let appliedDiscount = 0;
     if (normalizedReferralCode) {
@@ -382,7 +380,7 @@ export async function POST(req) {
 
     // 1) PDF bauen
     const sigBytes = dataUrlToUint8(signaturePng);
-    const finalPriceCents = Math.max(0, BASE_PRICE_CENTS - appliedDiscount);
+    const finalPriceCents = computeFinal(BASE_PRICE_CENTS, appliedDiscount);
     const usedPromoCode = referralMatch?.code || (normalizedReferralCode || null);
     const pdfBytes = await buildPdf(
       {
@@ -476,7 +474,7 @@ export async function POST(req) {
       total_cents: BASE_PRICE_CENTS,
     };
 
-    if (appliedDiscount > 0) {
+    if (!isInternalUser && appliedDiscount > 0) {
       // markiere Bestellung als Referral auch im Fallback
       orderPayload.referral_channel = "referral";
       orderPayload.referral_code = usedPromoCode;
@@ -542,7 +540,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Auftrag konnte nicht gespeichert werden." }, { status: 500 });
     }
 
-    if (referralMatch) {
+    if (!isInternalUser && referralMatch) {
       try {
         await admin
           .from("referral_codes")

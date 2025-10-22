@@ -43,9 +43,10 @@ export async function POST(req, { params }) {
     const { default: Stripe } = await import("stripe");
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-    const base = 29900; // 299 EUR in cents
+    const { BASE_PRICE_CENTS, computeFinal } = await import("@/lib/pricing");
+    const base = BASE_PRICE_CENTS;
     const discount = Math.max(0, Number(order?.discount_cents || 0));
-    const defaultAmount = Math.max(0, base - discount);
+    const defaultAmount = computeFinal(base, discount);
     const amount = Number.isFinite(Number(order?.total_cents)) && Number(order.total_cents) > 0
       ? Number(order.total_cents)
       : defaultAmount;

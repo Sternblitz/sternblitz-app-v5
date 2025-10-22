@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
+import { BASE_PRICE_CENTS, computeFinal } from "@/lib/pricing";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { supabase as supabaseClient } from "@/lib/supabaseClient";
 
 const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -168,6 +170,17 @@ export default function PaymentPage() {
   }, []);
 
   useEffect(() => {
+    // If internal user is logged in, suppress promo on payment
+    (async () => {
+      try {
+        const sb = supabaseClient();
+        const { data } = await sb.auth.getUser();
+        if (data?.user) {
+          setPromoInfo({ code: null, discount: 0 });
+          setRedeemTried(true);
+        }
+      } catch {}
+    })();
     if (!orderId) return;
     (async () => {
       try {
@@ -232,12 +245,12 @@ export default function PaymentPage() {
     } catch {}
   }, [promoInfo.code]);
 
-  const basePrice = 29900;
+  const basePrice = BASE_PRICE_CENTS;
   const appliedDiscount = Math.max(
     Number(orderMeta?.discount_cents || 0),
     Number(promoInfo.discount || 0)
   );
-  const computedFinal = Math.max(0, basePrice - appliedDiscount);
+  const computedFinal = computeFinal(basePrice, appliedDiscount);
   const finalPrice =
     (typeof orderMeta?.total_cents === "number" && Number(orderMeta?.discount_cents || 0) > 0)
       ? Math.max(0, Number(orderMeta.total_cents))

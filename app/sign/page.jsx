@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
+import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export default function SignPage() {
     try {
       const p = JSON.parse(sessionStorage.getItem("sb_checkout_payload") || "{}");
       const counts = p?.counts || { c123: null, c12: null, c1: null };
-      setSummary({
+      let next = {
         googleProfile: p?.googleProfile || "",
         googleUrl: p?.googleUrl || "",
         selectedOption: p?.selectedOption || "",
@@ -75,8 +76,45 @@ export default function SignPage() {
         lastName: p?.lastName || "",
         email: p?.email || "",
         phone: p?.phone || "",
-      });
-      setGoogleField(p?.googleProfile || "");
+      };
+      // Fallback: Prefill from session (Simulator) if checkout payload is empty
+      try {
+        if (!next.googleProfile) {
+          const rawSel = sessionStorage.getItem('sb_selected_profile') || '';
+          if (rawSel) {
+            const sel = JSON.parse(rawSel);
+            const name = sel?.name || '';
+            const address = sel?.address || '';
+            const url = sel?.url || '';
+            const gp = [name, address].filter(Boolean).join(', ');
+            if (gp) {
+              next.googleProfile = gp;
+              next.googleUrl = url;
+            }
+          }
+        }
+        if (!next.selectedOption) {
+          const opt = sessionStorage.getItem('sb_selected_option') || '';
+          if (opt) next.selectedOption = opt;
+        }
+        // Fallback stats → counts
+        if (!next.stats || !next.stats.breakdown) {
+          const rawStats = sessionStorage.getItem('sb_stats') || '';
+          if (rawStats) {
+            const s = JSON.parse(rawStats);
+            next.stats = s;
+            if (s?.breakdown) {
+              const b = s.breakdown;
+              const c1 = b[1] || 0;
+              const c12 = c1 + (b[2] || 0);
+              const c123 = c12 + (b[3] || 0);
+              next.counts = { c123, c12, c1 };
+            }
+          }
+        }
+      } catch {}
+      setSummary(next);
+      setGoogleField(next.googleProfile || "");
       setContactDraft({
         company: p?.company || "",
         firstName: p?.firstName || "",
@@ -96,24 +134,35 @@ export default function SignPage() {
 
   // ===== Promo/Referral Info aus Session/Cookie laden =====
   useEffect(() => {
-    try {
-      let code = null;
-      let discount = 0;
+    (async () => {
+      // If internal user is logged in, never show promo on sign
       try {
-        const storedCode = sessionStorage.getItem("sb_ref_code");
-        if (storedCode) code = storedCode;
-        const storedDiscount = sessionStorage.getItem("sb_ref_discount");
-        if (storedDiscount) discount = Number(storedDiscount) || 0;
+        const sb = supabaseClient();
+        const { data } = await sb.auth.getUser();
+        if (data?.user) {
+          setPromoInfo({ code: null, discount: 0 });
+          return;
+        }
       } catch {}
-      if (typeof document !== "undefined") {
-        const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
-        if (!code && match) code = decodeURIComponent(match[1]);
-      }
-      if (code) {
-        if (!discount) discount = 2500;
-        setPromoInfo({ code: code.toUpperCase(), discount });
-      }
-    } catch {}
+      try {
+        let code = null;
+        let discount = 0;
+        try {
+          const storedCode = sessionStorage.getItem("sb_ref_code");
+          if (storedCode) code = storedCode;
+          const storedDiscount = sessionStorage.getItem("sb_ref_discount");
+          if (storedDiscount) discount = Number(storedDiscount) || 0;
+        } catch {}
+        if (typeof document !== "undefined") {
+          const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+          if (!code && match) code = decodeURIComponent(match[1]);
+        }
+        if (code) {
+          if (!discount) discount = 2500;
+          setPromoInfo({ code: code.toUpperCase(), discount });
+        }
+      } catch {}
+    })();
   }, []);
 
   // ===== Canvas Setup (responsive, präzise auf Touch) =====
@@ -334,11 +383,11 @@ export default function SignPage() {
   const chosenLabel = optionLabel(summary.selectedOption);
   const chosenCount = optionCount(summary.selectedOption, summary.counts);
   const countText = fmtCount(chosenCount);
-  const basePriceCents = 29900;
+  const basePriceCents = BASE_PRICE_CENTS;
   const discountCents = promoInfo.discount || 0;
-  const finalPriceCents = Math.max(0, basePriceCents - discountCents);
-  const basePriceFormatted = (basePriceCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-  const finalPriceFormatted = (finalPriceCents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  const finalPriceCents = computeFinal(basePriceCents, discountCents);
+  const basePriceFormatted = formatEUR(basePriceCents);
+  const finalPriceFormatted = formatEUR(finalPriceCents);
 
   return (
     <main className="shell">

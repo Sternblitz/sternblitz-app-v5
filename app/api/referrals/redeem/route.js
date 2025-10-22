@@ -1,11 +1,18 @@
 // app/api/referrals/redeem/route.js
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
   try {
+    // Interne Nutzer (eingeloggt) dürfen keine Promo einlösen
+    try {
+      const supabase = supabaseServerAuth();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) return NextResponse.json({ error: "Promo-Code ist für interne Accounts deaktiviert." }, { status: 403 });
+    } catch {}
     const { order_id, code, email } = await req.json().catch(() => ({}));
     if (!order_id || !code) return NextResponse.json({ error: "order_id und code erforderlich" }, { status: 400 });
     const c = (code || "").toString().trim().toUpperCase();
