@@ -22,15 +22,15 @@ export default function LiveSimulator() {
   useEffect(() => {
     (async () => {
       try {
-        // If an internal user is logged in, suppress promo display entirely
-        const sb = supabaseClient();
-        const { data } = await sb.auth.getUser();
-        if (data?.user) {
-          setPromo({ code: null, discount: 0 });
-          return;
-        }
-      } catch {}
-      try {
+        const isFresh = (() => {
+          try {
+            const flag = sessionStorage.getItem('sb_ref_from_empfehlen');
+            const ts = Number(sessionStorage.getItem('sb_ref_from_empfehlen_at'));
+            if (!flag || !Number.isFinite(ts)) return false;
+            const age = Date.now() - ts;
+            return age >= 0 && age <= 30 * 60 * 1000; // 30 Minuten gültig
+          } catch { return false; }
+        })();
         let code = null;
         let discount = 0;
         try {
@@ -42,6 +42,13 @@ export default function LiveSimulator() {
         if (typeof document !== "undefined" && !code) {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (match) code = decodeURIComponent(match[1]);
+        }
+        if (!isFresh) {
+          // Clear stale promo to avoid sticky discount when not fresh from /empfehlen
+          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch {}
+          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch {}
+          setPromo({ code: null, discount: 0 });
+          return;
         }
         if (code) {
           if (!discount) discount = 2500;

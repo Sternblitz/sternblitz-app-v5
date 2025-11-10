@@ -53,16 +53,16 @@ export default function StartPage() {
 
   useEffect(() => {
     (async () => {
-      // If user is logged in (internal), never show promo on start
       try {
-        const sb = supabaseClient();
-        const { data } = await sb.auth.getUser();
-        if (data?.user) {
-          setPromo({ code: null, discount: 0 });
-          return;
-        }
-      } catch {}
-      try {
+        const isFresh = (() => {
+          try {
+            const flag = sessionStorage.getItem('sb_ref_from_empfehlen');
+            const ts = Number(sessionStorage.getItem('sb_ref_from_empfehlen_at'));
+            if (!flag || !Number.isFinite(ts)) return false;
+            const age = Date.now() - ts;
+            return age >= 0 && age <= 30 * 60 * 1000; // 30 Minuten gültig
+          } catch { return false; }
+        })();
         let code = null;
         let discount = 0;
         try {
@@ -74,6 +74,12 @@ export default function StartPage() {
         if (typeof document !== "undefined" && !code) {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (match) code = decodeURIComponent(match[1]);
+        }
+        if (!isFresh) {
+          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch {}
+          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch {}
+          setPromo({ code: null, discount: 0 });
+          return;
         }
         if (code) {
           if (!discount) discount = 2500;

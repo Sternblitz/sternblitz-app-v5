@@ -62,6 +62,9 @@ export default function ReferralPage() {
         if (typeof json.discount_cents === "number") {
           sessionStorage.setItem("sb_ref_discount", String(json.discount_cents));
         }
+        // Mark as fresh activation from /empfehlen with timestamp
+        sessionStorage.setItem("sb_ref_from_empfehlen", "1");
+        sessionStorage.setItem("sb_ref_from_empfehlen_at", String(Date.now()));
       } catch {}
       setStatus({
         ok: true,
@@ -126,22 +129,26 @@ export default function ReferralPage() {
         <button
           className="primary"
           type="button"
-          onClick={() => {
-            let ok = Boolean(status?.ok);
-            try { if (!ok) ok = Boolean(sessionStorage.getItem('sb_ref_code')); } catch {}
-            try {
-              if (!ok && typeof document !== 'undefined') {
-                const m = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
-                if (m) ok = true;
-              }
-            } catch {}
-            if (!ok) {
-              alert('Bitte gültigen Promo‑Code eingeben und aktivieren.');
-              return;
+        onClick={() => {
+          let ok = Boolean(status?.ok);
+          try { if (!ok) ok = Boolean(sessionStorage.getItem('sb_ref_code')); } catch {}
+          try {
+            if (!ok && typeof document !== 'undefined') {
+              const m = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+              if (m) ok = true;
             }
-            try { window.location.assign('/start'); } catch {}
-          }}
-        >Jetzt starten</button>
+          } catch {}
+          if (!ok) {
+            alert('Bitte gültigen Promo‑Code eingeben und aktivieren.');
+            return;
+          }
+          try {
+            sessionStorage.setItem('sb_ref_from_empfehlen', '1');
+            sessionStorage.setItem('sb_ref_from_empfehlen_at', String(Date.now()));
+          } catch {}
+          try { window.location.assign('/start'); } catch {}
+        }}
+      >Jetzt starten</button>
       </section>
 
       {myCode && showMine ? (

@@ -197,16 +197,16 @@ export default function SignPage() {
   // ===== Promo/Referral Info aus Session/Cookie laden =====
   useEffect(() => {
     (async () => {
-      // If internal user is logged in, never show promo on sign
       try {
-        const sb = supabaseClient();
-        const { data } = await sb.auth.getUser();
-        if (data?.user) {
-          setPromoInfo({ code: null, discount: 0 });
-          return;
-        }
-      } catch {}
-      try {
+        const isFresh = (() => {
+          try {
+            const flag = sessionStorage.getItem('sb_ref_from_empfehlen');
+            const ts = Number(sessionStorage.getItem('sb_ref_from_empfehlen_at'));
+            if (!flag || !Number.isFinite(ts)) return false;
+            const age = Date.now() - ts;
+            return age >= 0 && age <= 30 * 60 * 1000; // 30 Minuten gültig
+          } catch { return false; }
+        })();
         let code = null;
         let discount = 0;
         try {
@@ -218,6 +218,12 @@ export default function SignPage() {
         if (typeof document !== "undefined") {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (!code && match) code = decodeURIComponent(match[1]);
+        }
+        if (!isFresh) {
+          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch {}
+          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch {}
+          setPromoInfo({ code: null, discount: 0 });
+          return;
         }
         if (code) {
           if (!discount) discount = 2500;
@@ -523,12 +529,6 @@ export default function SignPage() {
         }
         if (typeof json?.discountCents === 'number') {
           sessionStorage.setItem('sb_ref_discount', String(json.discountCents));
-        }
-        // Clear applied promo for nächsten Auftrag
-        sessionStorage.removeItem('sb_ref_code');
-        sessionStorage.removeItem('sb_ref_discount');
-        if (typeof document !== 'undefined') {
-          document.cookie = 'sb_ref=; Max-Age=0; Path=/';
         }
       } catch {}
       // Direkt zur Zahlungsseite weiterleiten (Karte/SEPA hinterlegen)
