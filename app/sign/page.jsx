@@ -575,10 +575,12 @@ export default function SignPage() {
 
         {showEmailShare && (
           <section className="share-email">
+            <label htmlFor="share-email-input">E‑Mail des Kunden</label>
             <div className="row">
               <input
+                id="share-email-input"
                 type="email"
-                placeholder="E‑Mail des Kunden"
+                placeholder="z. B. kundin@firma.de"
                 value={shareToEmail}
                 onChange={(e) => setShareToEmail(e.target.value)}
               />
@@ -918,7 +920,7 @@ export default function SignPage() {
         .btn{height:36px;border-radius:999px;border:1px solid #e5e7eb;background:#f5f7fb;color:#0f172a;font-weight:900;padding:0 14px}
         .btn.share{background:#eef5ff;border-color:#dbeafe;color:#0b6cf2}
         .btn.email{background:#f5f5f7;border-color:#e5e7eb}
-        .btn.send{background:#0b6cf2;border-color:#0b6cf2;color:#fff}
+        .btn.send{background:#0b6cf2;border-color:#0b6cf2;color:#fff;min-width:150px;height:46px;justify-content:center;font-size:14px}
         .btn:disabled{opacity:.6}
         .emoji{filter: none}
         .share-email{border:1px solid #e5e7eb;background:#fff;border-radius:12px;padding:10px;margin:8px 0}
@@ -1174,9 +1176,10 @@ export default function SignPage() {
         .btn.send{background:#0b6cf2;border-color:#0b6cf2;color:#fff}
         .btn:disabled{opacity:.6}
         .emoji{filter: none}
-        .share-email{border:1px solid #e5e7eb;background:#fff;border-radius:12px;padding:12px;margin:10px 0}
-        .share-email .row{display:flex;gap:8px}
-        .share-email input{flex:1;height:34px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:6px 10px}
+        .share-email{border:1px solid #e5e7eb;background:#fff;border-radius:16px;padding:14px 16px;margin:10px 0;box-shadow:0 8px 20px rgba(15,23,42,.04)}
+        .share-email label{font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:6px;display:block}
+        .share-email .row{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap}
+        .share-email input{flex:1;min-width:220px;height:46px;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:0 14px;font-size:15px}
         .ok-msg{color:#166534;margin-top:8px;font-weight:800}
         .err-msg{color:#b91c1c;margin-top:8px}
       `}</style>

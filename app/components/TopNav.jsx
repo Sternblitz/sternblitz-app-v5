@@ -41,13 +41,6 @@ export default function TopNav() {
           <div className="actions">
             <button
               type="button"
-              className="btn remote"
-              onClick={() => router.push("/sign")}
-            >
-              🔗 Remote‑Auftrag
-            </button>
-            <button
-              type="button"
               className="btn orders"
               onClick={() => router.push("/dashboard/orders")}
             >
@@ -157,14 +150,6 @@ export default function TopNav() {
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
           font-weight: 700;
         }
-        .btn.remote {
-          background: #eef5ff;
-          color: #0b6cf2;
-          border: 1px solid #dbeafe;
-          box-shadow: 0 2px 6px rgba(11,108,242,.08);
-          font-weight: 800;
-        }
-        .btn.remote:hover { transform: translateY(-1px); }
         .btn.logout:hover {
           background: #e8e8ea;
           transform: translateY(-1px);
