@@ -287,6 +287,7 @@ export async function POST(req) {
       rep_code = null,        // neu: wird mitgespeichert
       source_account_id = null, // neu: wird mitgespeichert
       referralCode = null,
+      signLinkToken = null,
     } = body || {};
 
     const normalizedGoogleProfile =
@@ -357,6 +358,27 @@ export async function POST(req) {
     }
 
     const admin = supabaseAdmin();
+
+    // If sign link token is provided (remote signature), validate and capture ownership
+    let signLinkMeta = null;
+    if (signLinkToken) {
+      try {
+        const { data: link } = await admin
+          .from("sign_links")
+          .select("token, created_by, org_id, team_id, rep_code, expires_at, used_at")
+          .eq("token", signLinkToken)
+          .maybeSingle();
+        const nowMs = Date.now();
+        const expMs = link?.expires_at ? new Date(link.expires_at).getTime() : 0;
+        if (!link || link.used_at || !expMs || expMs < nowMs) {
+          return NextResponse.json({ error: "Signierlink ungültig oder abgelaufen." }, { status: 410 });
+        }
+        signLinkMeta = link;
+      } catch (e) {
+        console.warn("sign_link lookup failed", e);
+        return NextResponse.json({ error: "Signierlink konnte nicht geprüft werden." }, { status: 400 });
+      }
+    }
     let normalizedReferralCode = (referralCode || "").toString().trim().toUpperCase();
     // Fallback: Promo aus Cookie `sb_ref` lesen, falls im Body nicht gesetzt
     if (!normalizedReferralCode) {
@@ -529,6 +551,19 @@ export async function POST(req) {
     }
 
     let insertedOrder = null, insertError = null;
+    // Ownership override when sign link is used (customer is not logged in)
+    if (signLinkMeta) {
+      try {
+        if (signLinkMeta.created_by) {
+          // assign order to the rep who created the link
+          orderPayload.created_by = signLinkMeta.created_by;
+          orderPayload.source_account_id = signLinkMeta.created_by;
+        }
+        if (signLinkMeta.org_id) orderPayload.org_id = signLinkMeta.org_id;
+        if (signLinkMeta.team_id) orderPayload.team_id = signLinkMeta.team_id;
+        if (!orderPayload.rep_code && signLinkMeta.rep_code) orderPayload.rep_code = signLinkMeta.rep_code;
+      } catch {}
+    }
     if (user) {
       const { data, error } = await supabase
         .from("orders")
@@ -553,6 +588,17 @@ export async function POST(req) {
         console.warn("orders insert cleanup failed", cleanupErr);
       }
       return NextResponse.json({ error: "Auftrag konnte nicht gespeichert werden." }, { status: 500 });
+    }
+
+    if (signLinkMeta && insertedOrder?.id) {
+      try {
+        await admin
+          .from("sign_links")
+          .update({ used_at: new Date().toISOString() })
+          .eq("token", signLinkToken);
+      } catch (e) {
+        console.warn("sign_link mark used failed", e);
+      }
     }
 
     if (!isInternalUser && referralMatch) {

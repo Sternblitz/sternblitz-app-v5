@@ -13,6 +13,11 @@ export default function LiveSimulator() {
   const [activeOpt, setActiveOpt] = useState("123"); // "123" | "12" | "1"
   const [promo, setPromo] = useState({ code: null, discount: 0 });
   const prefilledOnce = useRef(false);
+  const [attentionActive, setAttentionActive] = useState(true);
+
+  const handleUserInput = () => {
+    if (attentionActive) setAttentionActive(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -474,9 +479,11 @@ export default function LiveSimulator() {
               type="search"
               inputMode="search"
               placeholder='Dein Unternehmen suchen... – z.B. "Restaurant XY"'
-              className="search-box attention"
+              className={`search-box ${attentionActive ? 'attention' : ''}`}
               autoComplete="off"
               onKeyDown={onKeyDown}
+              onFocus={handleUserInput}
+              onInput={handleUserInput}
             />
           </div>
 

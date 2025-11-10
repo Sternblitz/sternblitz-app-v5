@@ -48,6 +48,21 @@ export default function SignPage() {
   const [profileSource, setProfileSource] = useState({ name: "", address: "" });
   const [promoInfo, setPromoInfo] = useState({ code: null, discount: 0 });
   const [errors, setErrors] = useState({});
+  // Remote share/prefill
+  const [prefillToken, setPrefillToken] = useState(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareErr, setShareErr] = useState("");
+  const [shareToken, setShareToken] = useState("");
+  const [showEmailShare, setShowEmailShare] = useState(false);
+  const [shareToEmail, setShareToEmail] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailErr, setEmailErr] = useState("");
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shareLinkReady = Boolean(shareUrl);
+  const safeShareUrl = shareLinkReady ? shareUrl : "";
 
   // ===== Helpers =====
   const optionLabel = (opt) =>
@@ -132,6 +147,50 @@ export default function SignPage() {
           address: src?.address || "",
         });
       } catch {}
+    } catch {}
+  }, []);
+
+  // Prefill via share token (?t=...)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const t = url.searchParams.get("t");
+      if (!t) return;
+      (async () => {
+        try {
+          const res = await fetch(`/api/sign/prefill/${encodeURIComponent(t)}`);
+          const json = await res.json();
+          if (!res.ok) throw new Error(json?.error || "Prefill-Token ungültig");
+          const p = json?.payload || {};
+          const counts = p?.counts || { c123: null, c12: null, c1: null };
+          const next = {
+            googleProfile: p?.googleProfile || "",
+            googleUrl: p?.googleUrl || "",
+            selectedOption: p?.selectedOption || "",
+            counts,
+            stats: p?.stats || { totalReviews: null, averageRating: null, breakdown: null },
+            company: p?.company || "",
+            firstName: p?.firstName || "",
+            lastName: p?.lastName || "",
+            email: p?.email || "",
+            phone: p?.phone || "",
+          };
+          setSummary(next);
+          setGoogleField(next.googleProfile || "");
+          setContactDraft({
+            company: next.company,
+            firstName: next.firstName,
+            lastName: next.lastName,
+            email: next.email,
+            phone: next.phone,
+          });
+          try { if (json?.rep_code) sessionStorage.setItem("sb_rep_code", json.rep_code); } catch {}
+          setPrefillToken(t);
+          try { setShareToEmail(p?.email || ""); } catch {}
+        } catch (e) {
+          console.warn("Prefill Fehler", e);
+        }
+      })();
     } catch {}
   }, []);
 
@@ -293,6 +352,82 @@ export default function SignPage() {
     setEditOptionOpen(false);
   };
 
+  // Erzeugt teilbaren Link (nur für interne Nutzer verfügbar)
+  const createShareLink = async () => {
+    setShareErr("");
+    setShareUrl("");
+    setSharing(true);
+    try {
+      let repCode = null;
+      try { repCode = sessionStorage.getItem("sb_rep_code") || null; } catch {}
+      const payload = {
+        googleProfile: summary.googleProfile,
+        googleUrl: summary.googleUrl,
+        selectedOption: summary.selectedOption,
+        company: summary.company,
+        firstName: summary.firstName,
+        lastName: summary.lastName,
+        email: summary.email,
+        phone: summary.phone,
+        counts: summary.counts,
+        stats: summary.stats,
+      };
+      const res = await fetch("/api/sign/prefill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload, rep_code: repCode }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        const msg = json?.error || (res.status === 401 ? "Bitte zuerst einloggen, um einen Link zu erstellen." : "Fehler beim Erzeugen des Links");
+        throw new Error(msg);
+      }
+      const url = json?.url || "";
+      const token = json?.token || "";
+      setShareUrl(url);
+      setShareToken(token);
+      setShowSharePanel(true);
+      // Put in clipboard for convenience
+      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+      return { url, token };
+    } catch (e) {
+      setShareErr(e?.message || "Unbekannter Fehler");
+      try { alert(e?.message || "Fehler beim Erzeugen des Links"); } catch {}
+      return null;
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const sendShareEmail = async () => {
+    setEmailErr("");
+    setEmailSent(false);
+    setEmailSending(true);
+    try {
+      const email = (shareToEmail || "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Bitte gültige E‑Mail angeben");
+      // ensure we have a token
+      let token = shareToken;
+      if (!token) {
+        const created = await createShareLink();
+        token = created?.token || token || shareToken;
+      }
+      if (!token) throw new Error("Link konnte nicht erzeugt werden");
+      const res = await fetch('/api/sign/prefill/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, to_email: email }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || 'E-Mail Versand fehlgeschlagen');
+      setEmailSent(true);
+    } catch (e) {
+      setEmailErr(e?.message || 'E-Mail Versand fehlgeschlagen');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   // ===== Submit (PDF erzeugen + API call) =====
   const submit = async () => {
     // Inline Feld-Validierung (Kontakt)
@@ -373,6 +508,7 @@ export default function SignPage() {
           rep_code: repCode,             // neu
           source_account_id: sourceAccountId, // neu
           referralCode,
+          signLinkToken: prefillToken || null,
         }),
       });
 
@@ -387,6 +523,12 @@ export default function SignPage() {
         }
         if (typeof json?.discountCents === 'number') {
           sessionStorage.setItem('sb_ref_discount', String(json.discountCents));
+        }
+        // Clear applied promo for nächsten Auftrag
+        sessionStorage.removeItem('sb_ref_code');
+        sessionStorage.removeItem('sb_ref_discount');
+        if (typeof document !== 'undefined') {
+          document.cookie = 'sb_ref=; Max-Age=0; Path=/';
         }
       } catch {}
       // Direkt zur Zahlungsseite weiterleiten (Karte/SEPA hinterlegen)
@@ -417,6 +559,37 @@ export default function SignPage() {
         onLoad={onPlacesLoad}
       />
       <div className="page-container">
+        {/* Action Bar (oben rechts) */}
+        <div className="action-bar">
+          <div className="actions">
+            <button type="button" className="btn share" onClick={() => { setShowSharePanel(true); createShareLink(); }} disabled={sharing}>
+              <span className="emoji" aria-hidden>🔗</span>
+              {sharing ? 'Erzeuge Link…' : 'Link teilen'}
+            </button>
+            <button type="button" className="btn email" onClick={() => { setShowEmailShare((v) => !v); if (!shareUrl) createShareLink(); }}>
+              <span className="emoji" aria-hidden>✉️</span>
+              Per E‑Mail senden
+            </button>
+          </div>
+        </div>
+
+        {showEmailShare && (
+          <section className="share-email">
+            <div className="row">
+              <input
+                type="email"
+                placeholder="E‑Mail des Kunden"
+                value={shareToEmail}
+                onChange={(e) => setShareToEmail(e.target.value)}
+              />
+              <button type="button" className="btn send" onClick={sendShareEmail} disabled={emailSending}>
+                {emailSending ? 'Sende…' : 'Senden'}
+              </button>
+            </div>
+            {emailErr ? <div className="err-msg">{emailErr}</div> : null}
+            {emailSent ? <div className="ok-msg">E‑Mail gesendet.</div> : null}
+          </section>
+        )}
         {/* HERO */}
         <section className="card card-hero">
           <div className="hero-head">
@@ -455,6 +628,57 @@ export default function SignPage() {
             </div>
           </div>
         </section>
+
+        {/* Share panel */}
+        {showSharePanel ? (
+          <section className="share-panel">
+            <div className="share-head">
+              <div className="title">Teilen</div>
+              <button type="button" className="close" onClick={() => setShowSharePanel(false)} aria-label="Schließen">×</button>
+            </div>
+            <div className="share-row">
+              <input className="share-input" readOnly value={shareUrl} placeholder={sharing ? 'Erzeuge Link…' : 'Noch kein Link'} onFocus={(e) => e.target.select()} />
+              <button
+                className="copy-btn"
+                type="button"
+                onClick={async () => {
+                  try {
+                    let link = shareUrl;
+                    if (!link) {
+                      const created = await createShareLink();
+                      link = created?.url || link;
+                    }
+                    if (!link) return;
+                    await navigator.clipboard.writeText(link);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  } catch {}
+                }}
+              >
+                {copied ? 'Kopiert!' : 'Kopieren'}
+              </button>
+            </div>
+            <div className="share-actions">
+              <a
+                className={`wa ${shareLinkReady ? '' : 'disabled'}`}
+                href={shareLinkReady ? `https://wa.me/?text=${encodeURIComponent('Bitte unterschreiben: ' + safeShareUrl)}` : '#'}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => { if (!shareLinkReady) e.preventDefault(); }}
+              >
+                <span className="ico" aria-hidden>💬</span> WhatsApp
+              </a>
+              <a
+                className={`mail ${shareLinkReady ? '' : 'disabled'}`}
+                href={shareLinkReady ? `mailto:?subject=${encodeURIComponent('Auftragsbestätigung')}&body=${encodeURIComponent('Bitte unterschreiben:\n' + safeShareUrl)}` : '#'}
+                onClick={(e) => { if (!shareLinkReady) e.preventDefault(); }}
+              >
+                <span className="ico" aria-hidden>✉️</span> E‑Mail
+              </a>
+            </div>
+            {shareErr ? <div className="share-err">{shareErr}</div> : null}
+          </section>
+        ) : null}
 
         {promoInfo.code ? (
           <section className="promo-banner">
@@ -689,6 +913,19 @@ export default function SignPage() {
 
       {/* Styles */}
       <style jsx>{`
+        .action-bar{display:flex;justify-content:flex-end;align-items:center;margin:6px 2px}
+        .action-bar .actions{display:flex;gap:8px}
+        .btn{height:36px;border-radius:999px;border:1px solid #e5e7eb;background:#f5f7fb;color:#0f172a;font-weight:900;padding:0 14px}
+        .btn.share{background:#eef5ff;border-color:#dbeafe;color:#0b6cf2}
+        .btn.email{background:#f5f5f7;border-color:#e5e7eb}
+        .btn.send{background:#0b6cf2;border-color:#0b6cf2;color:#fff}
+        .btn:disabled{opacity:.6}
+        .emoji{filter: none}
+        .share-email{border:1px solid #e5e7eb;background:#fff;border-radius:12px;padding:10px;margin:8px 0}
+        .share-email .row{display:flex;gap:8px}
+        .share-email input{flex:1;height:34px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:6px 10px}
+        .ok-msg{color:#166534;margin-top:8px;font-weight:800}
+        .err-msg{color:#b91c1c;margin-top:8px}
         :root{
           --ink:#0f172a;
           --muted:#64748b;
@@ -914,6 +1151,34 @@ export default function SignPage() {
           cursor: not-allowed;
         }
         .submit-btn.next .label { font-size: 16px; }
+        .share-panel{background:#f7fafc;border:1px solid #e5e7eb;border-radius:14px;padding:12px 14px;margin:10px 0}
+        .share-row{display:flex;gap:8px}
+        .share-input{flex:1;border:1px solid #dbeafe;border-radius:10px;height:34px;padding:6px 10px}
+        .copy-btn{height:34px;border-radius:10px;border:1px solid #dbeafe;background:#eef5ff;color:#0b6cf2;font-weight:800;padding:0 10px}
+        .share-actions{display:flex;gap:10px;margin-top:8px}
+        .share-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
+        .share-head .title{font-weight:900;color:#0f172a}
+        .share-head .close{width:28px;height:28px;border-radius:50%;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
+        .share-actions a{display:inline-flex;align-items:center;height:34px;border-radius:999px;padding:0 12px;font-weight:900;text-decoration:none}
+        .share-actions .ico{margin-right:8px}
+        .share-actions .wa{background:#dcfce7;color:#14532d;border:1px solid #bbf7d0}
+        .share-actions .mail{background:#eef2ff;color:#1e3a8a;border:1px solid #dbeafe}
+        .share-actions a.disabled{opacity:.5;pointer-events:none}
+        .share-err{color:#b91c1c;margin-top:8px}
+        .action-bar{display:flex;justify-content:flex-end;align-items:center;margin:8px 2px 2px}
+        .action-bar .actions{display:flex;gap:8px}
+        .btn{height:36px;border-radius:999px;border:1px solid #e5e7eb;background:#f5f7fb;color:#0f172a;font-weight:900;padding:0 14px;display:inline-flex;align-items:center}
+        .btn .emoji{margin-right:8px}
+        .btn.share{background:#eef5ff;border-color:#dbeafe;color:#0b6cf2}
+        .btn.email{background:#f5f5f7;border-color:#e5e7eb}
+        .btn.send{background:#0b6cf2;border-color:#0b6cf2;color:#fff}
+        .btn:disabled{opacity:.6}
+        .emoji{filter: none}
+        .share-email{border:1px solid #e5e7eb;background:#fff;border-radius:12px;padding:12px;margin:10px 0}
+        .share-email .row{display:flex;gap:8px}
+        .share-email input{flex:1;height:34px;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:6px 10px}
+        .ok-msg{color:#166534;margin-top:8px;font-weight:800}
+        .err-msg{color:#b91c1c;margin-top:8px}
       `}</style>
     </main>
   );
