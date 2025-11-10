@@ -253,7 +253,7 @@ export default function PaymentPage() {
         if (match) code = decodeURIComponent(match[1]);
       }
       if (code) {
-        if (!discount) discount = 2500;
+        // Keine pauschale 25 € mehr – nutze nur den tatsächlich bekannten Rabatt
         setPromoInfo({ code: code.toUpperCase(), discount });
       }
     } catch {}
