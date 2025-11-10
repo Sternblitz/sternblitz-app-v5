@@ -618,7 +618,28 @@ export default function OrdersPage() {
         </div>
         {expanded ? (
           <div className="details">
-            <div className="detail-col">
+          <div className="detail-col">
+              <div className="detail-item">
+                <div className="detail-label">Preis</div>
+                <div className="detail-value">
+                  {(() => {
+                    const base = 29900;
+                    const disc = Number(row?.discount_cents || 0);
+                    const total = Number(row?.total_cents || 0);
+                    if (disc > 0) {
+                      const code = row?.referral_code ? String(row.referral_code).toUpperCase() : null;
+                      const finalCents = total > 0 ? total : Math.max(0, base - disc);
+                      return (
+                        <div>
+                          <div><b>Fixpreis:</b> <span className="old">{formatEUR(base/100)}</span> <span className="arrow">→</span> <span className="new">{formatEUR(finalCents/100)}</span></div>
+                          <div><b>Promo:</b> {code || 'aktiv'} {disc ? ` (−${formatEUR(disc/100)})` : ''}</div>
+                        </div>
+                      );
+                    }
+                    return <div><b>Fixpreis:</b> {formatEUR(base/100)} (einmalig)</div>;
+                  })()}
+                </div>
+              </div>
               <div className="detail-item">
                 <div className="detail-label">Kontakt</div>
                 {hasContactDetails ? (
