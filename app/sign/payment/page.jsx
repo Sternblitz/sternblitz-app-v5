@@ -239,25 +239,49 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (promoInfo.code) return;
-    try {
-      let code = null;
-      let discount = 0;
+    let cancelled = false;
+    (async () => {
       try {
-        const storedCode = sessionStorage.getItem("sb_ref_code");
-        if (storedCode) code = storedCode;
-        const storedDiscount = sessionStorage.getItem("sb_ref_discount");
-        if (storedDiscount) discount = Number(storedDiscount) || 0;
-      } catch {}
-      if (typeof document !== "undefined" && !code) {
-        const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
-        if (match) code = decodeURIComponent(match[1]);
-      }
-      if (code) {
-        // Keine pauschale 25 € mehr – nutze nur den tatsächlich bekannten Rabatt
+        let code = null;
+        let discount = 0;
+        try {
+          const storedCode = sessionStorage.getItem("sb_ref_code");
+          if (storedCode) code = storedCode;
+          const storedDiscount = sessionStorage.getItem("sb_ref_discount");
+          if (storedDiscount) discount = Number(storedDiscount) || 0;
+        } catch {}
+        if (typeof document !== "undefined" && !code) {
+          const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
+          if (match) code = decodeURIComponent(match[1]);
+        }
+        if (!code) return;
+        if (!discount) {
+          try {
+            const res = await fetch("/api/referrals/validate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ code }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (res.ok && json?.discount_cents) {
+              discount = Number(json.discount_cents) || 0;
+              try { sessionStorage.setItem("sb_ref_discount", String(discount)); } catch {}
+            }
+          } catch {}
+        }
+        if (cancelled) return;
         setPromoInfo({ code: code.toUpperCase(), discount });
-      }
-    } catch {}
+      } catch {}
+    })();
+    return () => { cancelled = true; };
   }, [promoInfo.code]);
+
+  useEffect(() => {
+    const discount = Number(orderMeta?.discount_cents || 0);
+    if (!discount) return;
+    const code = (orderMeta?.referral_code || "").toString().toUpperCase();
+    setPromoInfo({ code, discount });
+  }, [orderMeta?.discount_cents, orderMeta?.referral_code]);
 
   const basePrice = BASE_PRICE_CENTS;
   const appliedDiscount = Math.max(

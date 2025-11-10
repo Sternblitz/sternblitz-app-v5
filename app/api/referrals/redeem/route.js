@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
+import { BASE_PRICE_CENTS, computeFinal } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,14 @@ export async function POST(req) {
     const now = new Date();
     const valid = rc && rc.active && (!rc.expires_at || new Date(rc.expires_at) > now) && rc.uses_count < rc.max_uses;
     const discount = valid ? Math.max(0, Number(rc.discount_cents || 0)) : Math.max(0, Number(process.env.DEFAULT_REFERRAL_DISCOUNT_CENTS || 2500));
+    const base = BASE_PRICE_CENTS;
+    const final = computeFinal(base, discount);
     const patch = {
       referral_channel: "referral",
       referral_code: (valid ? rc.code : c),
       referral_referrer_order_id: valid ? (rc.referrer_order_id || null) : null,
       discount_cents: discount,
-      total_cents: Math.max(0, 29900 - discount),
+      total_cents: final,
     };
     const { data: updated, error: updErr } = await admin
       .from("orders")

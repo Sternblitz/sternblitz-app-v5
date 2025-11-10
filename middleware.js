@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
 export async function middleware(req) {
+  // Enforce HTTPS in production to keep payment forms in a secure context
+  if (process.env.NODE_ENV === 'production') {
+    const proto = req.headers.get('x-forwarded-proto');
+    if (proto && proto !== 'https') {
+      const host = req.headers.get('host');
+      const url = new URL(`https://${host}${req.nextUrl.pathname}${req.nextUrl.search}`);
+      return NextResponse.redirect(url);
+    }
+  }
+
   const res = NextResponse.next();
   const { pathname } = req.nextUrl;
 
