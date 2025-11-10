@@ -72,7 +72,7 @@ function PaymentForm({ orderId, billing }) {
       <PaymentElement options={{ layout: "tabs" }} />
       {error ? <div className="err">{error}</div> : null}
       <button className="confirm" type="submit" disabled={!stripe || submitting}>
-        {submitting ? "Speichere…" : "Zahlungsmittel hinterlegen"}
+        {submitting ? "Speichere…" : "Zahlungsmittel jetzt sicher hinterlegen"}
       </button>
       <p className="footnote">Stripe speichert deine Karte/SEPA nur zur Autorisierung. Belastung erst nach Erfolg.</p>
       <style jsx>{`
@@ -80,7 +80,7 @@ function PaymentForm({ orderId, billing }) {
         .err{color:#b91c1c;font-weight:700}
         .confirm{height:48px;border-radius:14px;border:none;background:linear-gradient(135deg,#0b6cf2 0%,#2563eb 100%);color:#fff;font-weight:900;font-size:15px;letter-spacing:.02em;box-shadow:0 12px 30px rgba(37,99,235,.35);cursor:pointer}
         .confirm:disabled{opacity:.6;cursor:not-allowed;box-shadow:none}
-        .footnote{margin:0;font-size:12.5px;color:#94a3b8;text-align:center}
+        .footnote{margin:2px 0 0;font-size:12px;color:#a3aec2;text-align:center}
         .form-finish{border:1px solid rgba(34,197,94,.3);background:#f0fdf4;border-radius:16px;padding:18px;text-align:center}
         .form-finish .badge{display:inline-block;padding:4px 10px;border-radius:999px;background:#bbf7d0;color:#0f5132;font-weight:800;margin-bottom:6px}
         .form-finish h3{margin:4px 0;color:#0f172a}
@@ -311,37 +311,42 @@ export default function PaymentPage() {
   return (
     <main className="pay-page">
       <section className="hero">
-        <div className="pill">Schritt 3 · Zahlung sichern</div>
-        <h1>Zahlung erst nach <span>nachweislicher Löschung</span></h1>
-        <p>Heute hinterlegst du nur Karte oder SEPA. Wir buchen den Fixpreis erst, wenn 90 % der vereinbarten Bewertungen verschwunden sind.</p>
-        <div className="hero-grid">
-          <div>
-            <strong>0 € Vorauszahlung</strong>
-            <span>Fixpreis { (basePrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" }) }</span>
-          </div>
-          <div>
-            <strong>Stripe & 3D‑Secure</strong>
-            <span>PCI DSS zertifiziert</span>
-          </div>
-          <div>
-            <strong>Manuelle Prüfung</strong>
-            <span>Auszahlung erst nach Erfolgsnachweis</span>
-          </div>
-        </div>
+        <div className="pill">Schritt 3 von 3 – Sicher abschließen</div>
+        <h1>Jetzt sicher beauftragen – <span>Zahlung erst nach Löschung</span></h1>
+        <p>Du hinterlegst dein Zahlungsmittel nur zur Autorisierung. Wir belasten erst nach bestätigtem Erfolg.</p>
+        <ul className="hero-bullets">
+          <li className="item">
+            <div className="icon">💸</div>
+            <div className="text">
+              <div className="title">0 € Vorkasse</div>
+              <div className="sub">Zahlung nach Erfolg</div>
+            </div>
+          </li>
+          <li className="item">
+            <div className="icon">🔒</div>
+            <div className="text">
+              <div className="title">Stripe‑Sicherheit</div>
+              <div className="sub">3D‑Secure & Verschlüsselung</div>
+            </div>
+          </li>
+          <li className="item">
+            <div className="icon">✅</div>
+            <div className="text">
+              <div className="title">Fair & transparent</div>
+              <div className="sub">Abbuchung erst nach Nachweis</div>
+            </div>
+          </li>
+        </ul>
       </section>
 
-      <section className="info-grid">
-        <article className="info-card"><div className="icon">🛡️</div><h3>Fair-Pay Garantie</h3><p>Keine Abbuchung ohne erfolgreiche Löschung. Dein Zahlungsmittel bleibt nur autorisiert.</p></article>
-        <article className="info-card"><div className="icon">🔁</div><h3>Vorautorisierung</h3><p>Stripe speichert deine Daten verschlüsselt und bestätigt dich via 3D‑Secure.</p></article>
-        <article className="info-card"><div className="icon">📄</div><h3>Rechnung & Nachweis</h3><p>Nach Erfolg erhältst du automatisch Rechnung und Abschlussbericht.</p></article>
-      </section>
+      {/* Info-Grid bewusst entfernt für mehr Ruhe – Hauptbotschaft oben, Details unten im Trust-Block */}
 
       <section className="content-grid">
-        <div className="summary-card">
+        <div className="summary-card compact">
           <header>
             <div>
               <p className="eyebrow">Rechnungsdaten</p>
-              <h2>Abrechnung vorbereiten</h2>
+              <h2>Rechnungsdaten (für deinen Löschbericht)</h2>
             </div>
             <button
               type="button"
@@ -410,7 +415,7 @@ export default function PaymentPage() {
                 </div>
               )}
               <div className="row-actions">
-                <button type="button" className="btn ghost" onClick={() => { setEditBilling(false); setBillingDraft(null); }}>Abbrechen</button>
+                <button type="button" className="link-cancel" onClick={() => { setEditBilling(false); setBillingDraft(null); }}>Abbrechen</button>
                 <button
                   type="button"
                   className="btn solid"
@@ -459,16 +464,16 @@ export default function PaymentPage() {
               <span className="new">{(finalPrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
             </div>
           </div>
-          <p className="note">Wir buchen erst nach bestätigter Löschung. Davor bleibt der Betrag vorgemerkt.</p>
+          <p className="note">Dein Zahlungsmittel bleibt nur hinterlegt – wir belasten erst nach bestätigtem Erfolg.</p>
           <p className="note small">Du erhältst automatisch eine Rechnung + Abschlussbericht.</p>
         </div>
 
         <div className="form-card">
           <header>
             <p className="eyebrow">Zahlungsmittel</p>
-            <h2>Karte oder SEPA hinterlegen</h2>
-            <p className="sub">Stripe speichert deine Daten verschlüsselt. Du kannst jederzeit eine andere Methode hinterlegen.</p>
-          </header>
+            <h2>Daten sicher hinterlegen</h2>
+            <p className="sub action">Damit wir starten können, hinterlege jetzt dein Zahlungsmittel. Keine Abbuchung vor Erfolg.</p>
+        </header>
           <Elements
             stripe={stripePromise}
             options={{
@@ -490,58 +495,57 @@ export default function PaymentPage() {
           >
             <PaymentForm orderId={orderId} billing={billing} />
           </Elements>
-          <div className="stripe-note"><span>🔐</span><p>Stripe (PCI‑konform) verwaltet deine Karte/SEPA. Belastung erst nach Erfolgsnachweis.</p></div>
+          <div className="stripe-note"><span>🔐</span><p>Stripe (PCI‑konform) verwaltet dein Zahlungsmittel sicher. Belastung erst nach Erfolgsnachweis.</p></div>
         </div>
       </section>
 
-      <section className="faq">
-        <article>
-          <h4>Wann erfolgt die Abbuchung?</h4>
-          <p>Sobald wir die Löschung abgeschlossen und dir bestätigt haben. Du erhältst davor eine Abschlussmail.</p>
-        </article>
-        <article>
-          <h4>Kann ich abbrechen?</h4>
-          <p>Ja. Du kannst vor der erfolgreichen Löschung jederzeit stoppen – es wird nichts berechnet.</p>
-        </article>
-        <article>
-          <h4>Welche Zahlungsmittel gehen?</h4>
-          <p>Visa, Mastercard, Amex sowie SEPA-Lastschrift. Alles läuft über Stripe.</p>
-        </article>
+      <section className="trust-block">
+        <div className="trust-item"><span className="ico">✅</span><div><h4>Zahlung nach Erfolg</h4><p>Keine Vorkasse, kein Risiko.</p></div></div>
+        <div className="trust-item"><span className="ico">🔒</span><div><h4>Sichere Stripe‑Verbindung</h4><p>3D‑Secure & Verschlüsselung.</p></div></div>
+        <div className="trust-item"><span className="ico">📩</span><div><h4>Rechnung & Bericht</h4><p>Automatisch per E‑Mail.</p></div></div>
+        <div className="trust-item"><span className="ico">💬</span><div><h4>Schneller Support</h4><p>Persönlich erreichbar.</p></div></div>
+      </section>
+
+      <section className="trust-logos">
+        <div className="badge">🔒 SSL‑verschlüsselt</div>
+        <div className="badge">💳 Stripe‑Zahlung</div>
+        <div className="badge">🇩🇪 Made in Germany</div>
       </section>
 
       <style jsx>{`
         .pay-page{min-height:100vh;padding:32px 16px 80px;background:radial-gradient(circle at top,#eef2ff,#ffffff 45%)}
-        .hero{max-width:960px;margin:0 auto 32px}
+        .hero{max-width:820px;margin:0 auto 26px}
         .pill{display:inline-flex;padding:6px 14px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
-        .hero h1{font-size:38px;margin:0;color:#0f172a;font-weight:900;line-height:1.15}
+        .hero h1{font-size:36px;margin:0;color:#0f172a;font-weight:900;line-height:1.15}
         .hero h1 span{color:#2563eb}
-        .hero p{max-width:640px;color:#475569;margin:14px 0 24px;font-size:18px}
-        .hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
-        .hero-grid div{padding:16px;border-radius:16px;background:#fff;border:1px solid rgba(37,99,235,.12);box-shadow:0 15px 40px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:4px}
-        .hero-grid strong{color:#0f172a}
-        .hero-grid span{color:#64748b;font-size:14px}
+        .hero p{max-width:640px;color:#475569;margin:10px 0 16px;font-size:16px}
+        .hero-bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+        .hero-bullets .item{display:flex;gap:12px;align-items:center;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 10px 26px rgba(15,23,42,.06)}
+        .hero-bullets .icon{font-size:20px;line-height:1}
+        .hero-bullets .text .title{font-weight:900;color:#0f172a}
+        .hero-bullets .text .sub{font-size:13.5px;color:#64748b}
 
-        .info-grid{max-width:980px;margin:0 auto 30px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-        .info-card{padding:20px;border-radius:18px;background:#fff;border:1px solid #e2e8f0;box-shadow:0 20px 50px rgba(15,23,42,.08)}
-        .info-card h3{margin:8px 0;color:#0f172a}
-        .info-card p{margin:0;color:#475569}
-        .info-card .icon{font-size:24px}
+        /* Info-Grid entfernt */
 
-        .content-grid{max-width:1100px;margin:0 auto 36px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}
-        .summary-card,.form-card{background:#fff;border-radius:26px;border:1px solid rgba(15,23,42,.08);box-shadow:0 25px 70px rgba(15,23,42,.12);padding:24px}
-        .summary-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+        .content-grid{max-width:1000px;margin:0 auto 32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px}
+        .summary-card,.form-card{background:#fff;border-radius:26px;border:1px solid rgba(15,23,42,.08);box-shadow:0 18px 48px rgba(15,23,42,.10);padding:20px}
+        .summary-card.compact{padding:16px}
+        .summary-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
         .eyebrow{margin:0;text-transform:uppercase;font-size:12px;letter-spacing:.2em;color:#94a3b8;font-weight:800}
-        .summary-card .details{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
-        .summary-card .details li{padding:10px 12px;background:#f8fafc;border-radius:14px;border:1px solid #e2e8f0;display:flex;flex-direction:column}
-        .summary-card .details span{font-size:12px;font-weight:800;color:#94a3b8}
-        .summary-card .details strong{font-size:15px;color:#0f172a}
+        .summary-card h2{font-size:18px;margin:2px 0 0}
+        .summary-card .details{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+        .summary-card .details li{padding:8px 10px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;display:flex;flex-direction:column}
+        .summary-card .details span{font-size:11px;font-weight:800;color:#94a3b8}
+        .summary-card .details strong{font-size:14px;color:#0f172a}
         .billing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 12px}
         .billing-grid .span2{grid-column:span 2}
         .billing-grid label span{font-size:12px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em}
         .billing-grid input,.billing-grid select{height:42px;border-radius:12px;border:1px solid #dfe7f5;padding:0 12px;font-size:14px}
         .stroke-btn{height:36px;border-radius:12px;border:1px solid #d0d7e8;background:#fff;font-weight:800;color:#0f172a;margin-bottom:10px}
-        .row-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
-        .btn{height:38px;border-radius:12px;padding:0 18px;font-weight:800}
+        .row-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+        .link-cancel{background:none;border:none;color:#64748b;font-weight:800;cursor:pointer}
+        .link-cancel:hover{color:#0f172a}
+        .btn{height:38px;border-radius:12px;padding:0 18px;font-weight:800;margin-left:auto}
         .btn.ghost{border:1px solid #d0d7e8;background:#fff;color:#0f172a}
         .btn.solid{border:1px solid #2563eb;background:#2563eb;color:#fff}
         .promo-chip{display:inline-flex;margin-top:16px;padding:6px 12px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-weight:800}
@@ -553,24 +557,34 @@ export default function PaymentPage() {
         .note{margin-top:12px;color:#475569;font-weight:600}
         .note.small{font-size:13px;color:#94a3b8}
 
-        .form-card header{margin-bottom:18px}
-        .form-card .sub{color:#64748b;margin:6px 0 0}
+        .form-card header{margin-bottom:14px}
+        .form-card .sub{color:#64748b;margin:4px 0 0}
+        .form-card .sub.action{color:#334155;font-weight:700}
         .icon-btn{border:1px solid #e2e8f0;background:#fff;border-radius:12px;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 10px 25px rgba(15,23,42,.1);cursor:pointer}
         .stripe-note{margin-top:16px;padding:12px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;display:flex;gap:10px;align-items:flex-start;color:#64748b;font-size:13px}
         .stripe-note span{font-size:18px}
 
-        .faq{max-width:980px;margin:0 auto;padding:24px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.1);display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
-        .faq h4{margin:0 0 6px;color:#0f172a}
-        .faq p{margin:0;color:#64748b;font-size:14px}
+        .trust-block{max-width:980px;margin:10px auto 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+        .trust-item{display:flex;gap:10px;align-items:flex-start;justify-content:center;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 10px 26px rgba(15,23,42,.06)}
+        .trust-item .ico{font-size:18px;line-height:1}
+        .trust-item h4{margin:0 0 4px;color:#0f172a}
+        .trust-item p{margin:0;color:#64748b;font-size:14px}
+
+        .trust-logos{max-width:980px;margin:0 auto 20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+        .trust-logos .badge{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;color:#0f172a;font-weight:800}
 
         @media(max-width:640px){
           .hero h1{font-size:30px}
+          .hero p{font-size:14.5px}
           .hero-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
           .row-actions{flex-direction:column}
           .btn{width:100%}
           .content-grid{grid-template-columns:1fr;gap:18px}
         }
       `}</style>
+      <div className="page-cancel">
+        <button className="link-cancel" type="button" onClick={() => { try { window.history.back(); } catch { try { window.location.assign('/sign'); } catch {} } }}>Abbrechen und zurück</button>
+      </div>
     </main>
   );
 }

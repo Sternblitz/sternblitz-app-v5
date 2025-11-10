@@ -37,6 +37,10 @@ export default function OrdersPage() {
   const [boardMode, setBoardMode] = useState("reps"); // 'reps' | 'teams'
   const [savingStatusId, setSavingStatusId] = useState(null);
   const [qrForId, setQrForId] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState({}); // { [orderId]: true }
+  const [confirmEmail, setConfirmEmail] = useState({}); // { [orderId]: email }
+  const [confirmSending, setConfirmSending] = useState({}); // { [orderId]: bool }
+  const [confirmMsg, setConfirmMsg] = useState({}); // { [orderId]: string|null }
   const [notesDraft, setNotesDraft] = useState({}); // { [orderId]: { sales: string, admin: string } }
   const [promoOnly, setPromoOnly] = useState(false);
 
@@ -683,6 +687,55 @@ export default function OrdersPage() {
                       ) : null}
                     </>
                   ) : null}
+                  <button
+                    type="button"
+                    className="mini-btn send"
+                    onClick={() => {
+                      setConfirmOpen((m) => ({ ...m, [row.id]: !m[row.id] }));
+                      setConfirmMsg((m) => ({ ...m, [row.id]: null }));
+                      setConfirmEmail((m) => ({ ...m, [row.id]: row.email || '' }));
+                    }}
+                  >
+                    Auftragsbestätigung senden
+                  </button>
+                  {confirmOpen[row.id] ? (
+                    <div className="send-box">
+                      <input
+                        type="email"
+                        placeholder="E‑Mail des Kunden"
+                        value={confirmEmail[row.id] || ''}
+                        onChange={(e) => setConfirmEmail((m) => ({ ...m, [row.id]: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="mini-btn blue"
+                        disabled={confirmSending[row.id]}
+                        onClick={async () => {
+                          setConfirmMsg((m) => ({ ...m, [row.id]: null }));
+                          setConfirmSending((m) => ({ ...m, [row.id]: true }));
+                          try {
+                            const to = (confirmEmail[row.id] || '').trim();
+                            const res = await fetch(`/api/orders/${row.id}/send-confirmation`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ to }),
+                            });
+                            const j = await res.json().catch(() => ({}));
+                            if (!res.ok) throw new Error(j?.error || 'Versand fehlgeschlagen');
+                            setConfirmMsg((m) => ({ ...m, [row.id]: 'E‑Mail gesendet.' }));
+                          } catch (e) {
+                            setConfirmMsg((m) => ({ ...m, [row.id]: e?.message || 'Versand fehlgeschlagen' }));
+                          } finally {
+                            setConfirmSending((m) => ({ ...m, [row.id]: false }));
+                          }
+                        }}
+                      >
+                        {confirmSending[row.id] ? (<span className="loader" aria-hidden />) : null}
+                        {confirmSending[row.id] ? ' Sende…' : 'Senden'}
+                      </button>
+                      {confirmMsg[row.id] ? <div className="send-msg">{confirmMsg[row.id]}</div> : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -790,6 +843,12 @@ export default function OrdersPage() {
           .detail-value.empty { color:#94a3b8; font-weight: 500; }
           .detail-value.links { display:flex; flex-direction: column; gap: 6px; }
           .detail-value .cta-link { font-weight:800; color:#0b6cf2; text-decoration:none }
+          .mini-btn.send { height:32px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; font-weight:800 }
+          .send-box{ display:flex; gap:8px; align-items:center; margin-top:8px }
+          .send-box input{ flex:1; height:32px; border:1px solid #e5e7eb; border-radius:10px; padding:6px 8px }
+          .send-msg{ margin-top:6px; color:#166534; font-weight:800 }
+          .loader{ display:inline-block; width:14px; height:14px; border:2px solid #dbeafe; border-top-color:#0b6cf2; border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:6px }
+          @keyframes spin{ to { transform: rotate(360deg) } }
           .mini-btn.qr { border-color:#e5e7eb; background:#fff; }
           .qr { width:220px; height:220px; margin-top:6px; border:1px solid #e5e7eb; border-radius:10px; }
           .hint { color:#94a3b8; font-size: 12px; }
