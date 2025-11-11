@@ -52,7 +52,15 @@ export async function POST(req, { params }) {
       : defaultAmount;
     const currency = "eur";
 
-    const pi = await stripe.paymentIntents.create({
+    // ensure allowed payment_method_types match the saved method
+    let methodType = order.payment_method_type || null;
+    if (!methodType) {
+      try {
+        const pm = await stripe.paymentMethods.retrieve(order.stripe_payment_method_id);
+        methodType = pm?.type || null;
+      } catch {}
+    }
+    const params = {
       amount,
       currency,
       customer: order.stripe_customer_id,
@@ -61,7 +69,13 @@ export async function POST(req, { params }) {
       confirm: true,
       receipt_email: order.email || undefined,
       metadata: { order_id: orderId, referral_code: order.referral_code || undefined },
-    });
+    };
+    if (methodType) {
+      params.payment_method_types = [methodType];
+    } else {
+      params.automatic_payment_methods = { enabled: true };
+    }
+    const pi = await stripe.paymentIntents.create(params);
 
     // update order status accordingly
     const update = {
