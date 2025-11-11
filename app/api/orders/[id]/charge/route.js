@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 import { supabaseAdmin } from "@/lib/supabaseServer";
+import Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,7 +42,6 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
     }
 
-    const { default: Stripe } = await import("stripe");
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
     const { BASE_PRICE_CENTS, computeFinal } = await import("@/lib/pricing");
