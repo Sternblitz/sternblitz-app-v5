@@ -61,6 +61,7 @@ export async function POST(req, { params }) {
         methodType = pm?.type || null;
       } catch {}
     }
+    const normalizedType = methodType ? String(methodType).toLowerCase() : null;
     const chargeParams = {
       amount,
       currency,
@@ -71,8 +72,15 @@ export async function POST(req, { params }) {
       receipt_email: order.email || undefined,
       metadata: { order_id: orderId, referral_code: order.referral_code || undefined },
     };
-    if (methodType) {
-      chargeParams.payment_method_types = [methodType];
+    if (normalizedType) {
+      chargeParams.payment_method_types = [normalizedType];
+      if (normalizedType === "sepa_debit") {
+        chargeParams.payment_method_options = {
+          sepa_debit: {
+            mandate_options: { interval: "sporadic" },
+          },
+        };
+      }
     } else {
       chargeParams.automatic_payment_methods = { enabled: true };
     }
