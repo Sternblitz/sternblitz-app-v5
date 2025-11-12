@@ -74,13 +74,6 @@ export async function POST(req, { params }) {
       chargeParams.payment_method_types = normalizedType === "sepa_debit"
         ? ["sepa_debit", "card"]
         : ["card", "sepa_debit"];
-      if (normalizedType === "sepa_debit") {
-        chargeParams.payment_method_options = {
-          sepa_debit: {
-            mandate_options: { interval: "sporadic" },
-          },
-        };
-      }
     } else {
       chargeParams.automatic_payment_methods = { enabled: true };
     }
