@@ -13,9 +13,7 @@ begin
   -- If no authenticated user: allow service_role to insert as-is (for remote links)
   if auth.uid() is null then
     if jwt_role = 'service_role' then
-      if new.created_at is null then new.created_at := now(); end if;
-      if new.status is null then new.status := 'NEW'; end if;
-      return new; -- keep provided org_id/team_id/created_by/source_account_id
+      return new; -- allow pre-filled fields for service inserts
     end if;
     raise exception 'Authenticated user required to create orders.';
   end if;
@@ -60,4 +58,3 @@ begin
   return new;
 end;
 $$;
-

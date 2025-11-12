@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 import { supabaseAdmin } from "@/lib/supabaseServer";
 import Stripe from "stripe";
+import { BASE_PRICE_CENTS, computeFinal } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -44,7 +45,6 @@ export async function POST(req, { params }) {
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-    const { BASE_PRICE_CENTS, computeFinal } = await import("@/lib/pricing");
     const base = BASE_PRICE_CENTS;
     const discount = Math.max(0, Number(order?.discount_cents || 0));
     const defaultAmount = computeFinal(base, discount);
@@ -61,7 +61,7 @@ export async function POST(req, { params }) {
         methodType = pm?.type || null;
       } catch {}
     }
-    const params = {
+    const chargeParams = {
       amount,
       currency,
       customer: order.stripe_customer_id,
@@ -72,11 +72,11 @@ export async function POST(req, { params }) {
       metadata: { order_id: orderId, referral_code: order.referral_code || undefined },
     };
     if (methodType) {
-      params.payment_method_types = [methodType];
+      chargeParams.payment_method_types = [methodType];
     } else {
-      params.automatic_payment_methods = { enabled: true };
+      chargeParams.automatic_payment_methods = { enabled: true };
     }
-    const pi = await stripe.paymentIntents.create(params);
+    const pi = await stripe.paymentIntents.create(chargeParams);
 
     // update order status accordingly
     const update = {
