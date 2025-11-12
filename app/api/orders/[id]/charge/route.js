@@ -55,12 +55,10 @@ export async function POST(req, { params }) {
 
     // ensure allowed payment_method_types match the saved method
     let methodType = order.payment_method_type || null;
-    if (!methodType) {
-      try {
-        const pm = await stripe.paymentMethods.retrieve(order.stripe_payment_method_id);
-        methodType = pm?.type || null;
-      } catch {}
-    }
+    try {
+      const pm = await stripe.paymentMethods.retrieve(order.stripe_payment_method_id);
+      if (pm?.type) methodType = pm.type;
+    } catch {}
     const normalizedType = methodType ? String(methodType).toLowerCase() : null;
     const chargeParams = {
       amount,
@@ -73,7 +71,9 @@ export async function POST(req, { params }) {
       metadata: { order_id: orderId, referral_code: order.referral_code || undefined },
     };
     if (normalizedType) {
-      chargeParams.payment_method_types = [normalizedType];
+      chargeParams.payment_method_types = normalizedType === "sepa_debit"
+        ? ["sepa_debit", "card"]
+        : ["card", "sepa_debit"];
       if (normalizedType === "sepa_debit") {
         chargeParams.payment_method_options = {
           sepa_debit: {
