@@ -466,6 +466,9 @@ export default function SignPage() {
             />
           </div>
           <h1>SEO-Auftragsbestätigung <b>Sternblitz</b></h1>
+          <p className="lead">
+            Monatlicher Fixpreis <b>99 €</b> · monatlich kündbar · keine Kündigungsfrist
+          </p>
           <p className="lead">Im Leistungsumfang enthalten:</p>
 
           <div className="bullets">
