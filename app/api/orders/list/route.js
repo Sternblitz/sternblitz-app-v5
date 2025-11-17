@@ -117,7 +117,6 @@ export async function GET(req) {
       .limit(200);
 
     if (gte && lt) q = q.gte("created_at", toISO(gte)).lt("created_at", toISO(lt));
-
     const { data, error } = await q;
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

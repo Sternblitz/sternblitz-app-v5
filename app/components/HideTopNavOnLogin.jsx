@@ -16,6 +16,7 @@ export default function HideTopNavOnLogin({ children }) {
     "/start",
     "/sign",
     "/sign/payment",
+    "/seo",
   ]; // TopBar auf diesen Routen nicht anzeigen
 
   // Wenn die aktuelle Route in der Liste ist → nichts rendern

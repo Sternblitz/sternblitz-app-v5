@@ -14,9 +14,23 @@ export default function LiveSimulator() {
   const [promo, setPromo] = useState({ code: null, discount: 0 });
   const prefilledOnce = useRef(false);
   const [attentionActive, setAttentionActive] = useState(true);
+  const [hasInputValue, setHasInputValue] = useState(false);
 
   const handleUserInput = () => {
     if (attentionActive) setAttentionActive(false);
+  };
+
+  const setInputValue = (value = "") => {
+    if (inputRef.current) inputRef.current.value = value;
+    setHasInputValue(Boolean((value || "").trim()));
+  };
+
+  const clearInput = () => {
+    setInputValue("");
+    setData(null);
+    setError("");
+    setLoadingText("");
+    try { sessionStorage.removeItem("sb_selected_profile"); } catch {}
   };
 
   useEffect(() => {
@@ -86,9 +100,7 @@ export default function LiveSimulator() {
         } catch {}
 
         // Input zeigt den gewählten Eintrag
-        if (inputRef.current) {
-          inputRef.current.value = `${name}${address ? ", " + address : ""}`;
-        }
+        setInputValue(`${name}${address ? ", " + address : ""}`);
 
         // Reviews laden – aber KEIN Formular öffnen!
         runFetch(name, address);
@@ -189,9 +201,7 @@ export default function LiveSimulator() {
         try {
           sessionStorage.setItem('sb_selected_profile', JSON.stringify({ name: finalName, address: finalAddress || '', url }));
         } catch {}
-        if (inputRef.current) {
-          inputRef.current.value = `${finalName}${finalAddress ? ", " + finalAddress : ''}`;
-        }
+        setInputValue(`${finalName}${finalAddress ? ", " + finalAddress : ''}`);
         runFetch(finalName, finalAddress);
       } else {
         // 2) Fallback: From sessionStorage (if already set)
@@ -202,7 +212,7 @@ export default function LiveSimulator() {
             const n = (sel?.name || '').trim();
             const a = (sel?.address || '').trim();
             if (n) {
-              if (inputRef.current) inputRef.current.value = `${n}${a ? ", " + a : ''}`;
+              setInputValue(`${n}${a ? ", " + a : ''}`);
               runFetch(n, a);
             }
           }
@@ -480,18 +490,31 @@ export default function LiveSimulator() {
         <div className="review-card">
           {/* Eingabefeld stets zentriert */}
           <div className="input-wrapper">
-            <input
-              ref={inputRef}
-              id="company-input"
-              type="search"
-              inputMode="search"
-              placeholder='Dein Unternehmen suchen... – z.B. "Restaurant XY"'
-              className={`search-box ${attentionActive ? 'attention' : ''}`}
-              autoComplete="off"
-              onKeyDown={onKeyDown}
-              onFocus={handleUserInput}
-              onInput={handleUserInput}
-            />
+            <div className="input-shell">
+              <input
+                ref={inputRef}
+                id="company-input"
+                type="search"
+                inputMode="search"
+                placeholder='Dein Unternehmen suchen... – z.B. "Restaurant XY"'
+                className={`search-box ${attentionActive ? 'attention' : ''}`}
+                autoComplete="off"
+                onKeyDown={onKeyDown}
+                onFocus={handleUserInput}
+                onInput={(e) => {
+                  handleUserInput();
+                  setHasInputValue(Boolean((e.target.value || '').trim()));
+                }}
+              />
+              <button
+                type="button"
+                className={`clear-input ${hasInputValue ? 'show' : ''}`}
+                onClick={clearInput}
+                aria-label="Eingabe löschen"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           {loadingText && <div id="review-output" className="loading-text">{loadingText}</div>}
@@ -516,7 +539,11 @@ export default function LiveSimulator() {
 
         /* Eingabefeld zentrieren + Breite kontrollieren */
         .input-wrapper{display:flex;justify-content:center}
-        .search-box{display:block;width:100%;max-width:675px;margin:0 auto;padding:9px 20px;border:1px solid rgba(1,1,1,.1);border-radius:8px;font-family:Poppins;font-size:18px;line-height:150%;outline:none;box-sizing:border-box}
+        .input-shell{position:relative;width:100%;max-width:675px}
+        .search-box{display:block;width:100%;margin:0 auto;padding:9px 44px 9px 20px;border:1px solid rgba(1,1,1,.1);border-radius:8px;font-family:Poppins;font-size:18px;line-height:150%;outline:none;box-sizing:border-box}
+        .clear-input{position:absolute;top:50%;right:12px;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:1px solid rgba(1,1,1,.12);background:#fff;font-size:18px;font-weight:600;color:#5f6368;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s ease, background .15s ease, transform .15s ease}
+        .clear-input.show{opacity:.85;pointer-events:auto}
+        .clear-input:hover{background:#f7f7f8;transform:translateY(-50%) scale(1.05)}
         .search-box:focus{border-color:#49a84c}
         .search-box.attention{animation:breathe 2.2s ease-in-out infinite}
         @keyframes breathe{0%{transform:scale(.985);box-shadow:0 0 0 rgba(73,168,76,0)}50%{transform:scale(1);box-shadow:0 10px 28px rgba(73,168,76,.18)}100%{transform:scale(.985);box-shadow:0 0 0 rgba(73,168,76,0)}}
