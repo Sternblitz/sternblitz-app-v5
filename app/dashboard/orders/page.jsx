@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ const OPTION_LABELS = {
 };
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [range, setRange] = useState("all");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -161,7 +163,7 @@ export default function OrdersPage() {
         const res = await fetch("/api/me", { headers: { Accept: "application/json" } });
         const json = await res.json().catch(() => ({}));
         if (alive && res.ok) setMe(json?.profile || null);
-      } catch {}
+      } catch { }
     })();
     return () => { alive = false; };
   }, []);
@@ -178,7 +180,7 @@ export default function OrdersPage() {
           for (const t of json.rows) map[t.id] = t.name;
           setTeamMap(map);
         }
-      } catch {}
+      } catch { }
     })();
     return () => { alive = false; };
   }, []);
@@ -226,7 +228,7 @@ export default function OrdersPage() {
         if (alive && res.ok && json?.map) {
           setRepMap((prev) => ({ ...prev, ...json.map }));
         }
-      } catch {}
+      } catch { }
     })();
     return () => { alive = false; };
   }, [rows, repMap]);
@@ -245,17 +247,17 @@ export default function OrdersPage() {
         setRows((prev) =>
           Array.isArray(prev)
             ? prev.map((item) =>
-                item.id === orderId
-                  ? {
-                      ...item,
-                      ...json.row,
-                      counts:
-                        json.row?.counts && typeof json.row.counts === "object"
-                          ? json.row.counts
-                          : item.counts ?? null,
-                    }
-                  : item
-              )
+              item.id === orderId
+                ? {
+                  ...item,
+                  ...json.row,
+                  counts:
+                    json.row?.counts && typeof json.row.counts === "object"
+                      ? json.row.counts
+                      : item.counts ?? null,
+                }
+                : item
+            )
             : prev
         );
       }
@@ -301,13 +303,13 @@ export default function OrdersPage() {
     const liveAverage = Number.isFinite(liveAverageRaw)
       ? liveAverageRaw
       : Number.isFinite(startAverage)
-      ? startAverage
-      : null;
+        ? startAverage
+        : null;
     const liveTotalDisplay = Number.isFinite(liveTotal)
       ? liveTotal
       : Number.isFinite(startTotal)
-      ? startTotal
-      : null;
+        ? startTotal
+        : null;
 
     const removed =
       Number.isFinite(startSum) && Number.isFinite(liveSum)
@@ -324,12 +326,12 @@ export default function OrdersPage() {
     const lastRefresh = row?.last_refreshed_at || row?.created_at;
     const countsLine = countsObj
       ? [
-          Number.isFinite(countsObj.c123) ? `${formatInt(countsObj.c123)}× 1–3★` : null,
-          Number.isFinite(countsObj.c12) ? `${formatInt(countsObj.c12)}× 1–2★` : null,
-          Number.isFinite(countsObj.c1) ? `${formatInt(countsObj.c1)}× 1★` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
+        Number.isFinite(countsObj.c123) ? `${formatInt(countsObj.c123)}× 1–3★` : null,
+        Number.isFinite(countsObj.c12) ? `${formatInt(countsObj.c12)}× 1–2★` : null,
+        Number.isFinite(countsObj.c1) ? `${formatInt(countsObj.c1)}× 1★` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
       : null;
 
     return {
@@ -423,7 +425,7 @@ export default function OrdersPage() {
     const statusKey = (row?.status || "").toLowerCase();
     const showStatus = row?.status && !statusKey.includes("new");
     const repInfo = repMap?.[row?.created_by] || null;
-    const repName = repInfo?.full_name || row?.rep_code || (row?.created_by ? String(row.created_by).slice(0,8) : null);
+    const repName = repInfo?.full_name || row?.rep_code || (row?.created_by ? String(row.created_by).slice(0, 8) : null);
     const teamName = teamMap?.[row?.team_id] || null;
 
     const draft = notesDraft[row.id] || {
@@ -447,10 +449,12 @@ export default function OrdersPage() {
         if (!res.ok) throw new Error(json?.error || "Speichern fehlgeschlagen");
         if (json?.row) {
           setRows((prev) => prev.map((it) => it.id === row.id ? { ...it, custom_notes: json.row.custom_notes ?? it.custom_notes, counts: json.row.counts ?? it.counts } : it));
-          setNotesDraft((prev) => ({ ...prev, [row.id]: {
-            sales: json?.row?.custom_notes || "",
-            admin: (json?.row?.counts && json.row.counts._admin_notes) ? String(json.row.counts._admin_notes) : "",
-          }}));
+          setNotesDraft((prev) => ({
+            ...prev, [row.id]: {
+              sales: json?.row?.custom_notes || "",
+              admin: (json?.row?.counts && json.row.counts._admin_notes) ? String(json.row.counts._admin_notes) : "",
+            }
+          }));
         }
       } catch (e) {
         alert(e?.message || "Speichern fehlgeschlagen");
@@ -482,7 +486,7 @@ export default function OrdersPage() {
 
     const onCharge = async () => {
       if (!canCharge) return;
-      if (!confirm(`Jetzt ${formatEUR(chargeAmountCents/100)} abbuchen?`)) return;
+      if (!confirm(`Jetzt ${formatEUR(chargeAmountCents / 100)} abbuchen?`)) return;
       try {
         const res = await fetch(`/api/orders/${row.id}/charge`, { method: "POST" });
         const json = await res.json().catch(() => ({}));
@@ -499,7 +503,7 @@ export default function OrdersPage() {
         <div className="summary">
           <div className="summary-main">
             <div className="summary-info">
-              { (me?.role === "TEAM_LEADER" || me?.role === "ADMIN") && (
+              {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN") && (
                 <div className="rep-title">{repName || "Unbekannter Vertriebler"}</div>
               )}
               <div className="summary-headline">
@@ -521,17 +525,17 @@ export default function OrdersPage() {
                 <div className="ref-line">
                   <span className="pill info">Empfehlung</span>
                   {promoCode ? (
-                    <span className="pill promo">🎉 Promo: {promoCode}{promoValue ? ` (−${formatEUR(promoValue/100)})` : ""}</span>
+                    <span className="pill promo">🎉 Promo: {promoCode}{promoValue ? ` (−${formatEUR(promoValue / 100)})` : ""}</span>
                   ) : null}
                   {promoValue ? (
-                    <span className="pill ok">Promo −{formatEUR(promoValue/100)}</span>
+                    <span className="pill ok">Promo −{formatEUR(promoValue / 100)}</span>
                   ) : null}
                 </div>
               ) : null}
               <div className="pay-line">
                 <span className={`pill ${pmOnFile ? 'ok' : 'warn'}`}>{pmOnFile ? 'Zahlungsmittel hinterlegt' : 'Keine Zahlungsdaten'}</span>
                 {payStatus ? <span className="pill info">Status: {payStatus}</span> : null}
-                {row?.charged_amount ? <span className="pill ok">Bezahlt: {formatEUR(row.charged_amount/100)}</span> : null}
+                {row?.charged_amount ? <span className="pill ok">Bezahlt: {formatEUR(row.charged_amount / 100)}</span> : null}
               </div>
             </div>
             <div className="summary-actions">
@@ -544,7 +548,7 @@ export default function OrdersPage() {
                 {expanded ? "🔼 Zuklappen" : "🔎 Details"}
               </button>
               {canCharge ? (
-                <button type="button" className="mini-btn primary" onClick={onCharge}>{formatEUR(chargeAmountCents/100)} abbuchen</button>
+                <button type="button" className="mini-btn primary" onClick={onCharge}>{formatEUR(chargeAmountCents / 100)} abbuchen</button>
               ) : null}
               {me?.role === "ADMIN" && (
                 <StatusControl
@@ -618,7 +622,7 @@ export default function OrdersPage() {
         </div>
         {expanded ? (
           <div className="details">
-          <div className="detail-col">
+            <div className="detail-col">
               <div className="detail-item">
                 <div className="detail-label">Preis</div>
                 <div className="detail-value">
@@ -631,12 +635,12 @@ export default function OrdersPage() {
                       const finalCents = total > 0 ? total : Math.max(0, base - disc);
                       return (
                         <div>
-                          <div><b>Fixpreis:</b> <span className="old">{formatEUR(base/100)}</span> <span className="arrow">→</span> <span className="new">{formatEUR(finalCents/100)}</span></div>
-                          <div><b>Promo:</b> {code || 'aktiv'} {disc ? ` (−${formatEUR(disc/100)})` : ''}</div>
+                          <div><b>Fixpreis:</b> <span className="old">{formatEUR(base / 100)}</span> <span className="arrow">→</span> <span className="new">{formatEUR(finalCents / 100)}</span></div>
+                          <div><b>Promo:</b> {code || 'aktiv'} {disc ? ` (−${formatEUR(disc / 100)})` : ''}</div>
                         </div>
                       );
                     }
-                    return <div><b>Fixpreis:</b> {formatEUR(base/100)} (einmalig)</div>;
+                    return <div><b>Fixpreis:</b> {formatEUR(base / 100)} (einmalig)</div>;
                   })()}
                 </div>
               </div>
@@ -702,9 +706,11 @@ export default function OrdersPage() {
                       <a className="cta-link" href={`/sign/payment?order=${row.id}`} target="_blank" rel="noreferrer">Zahlungsart hinzufügen ↗</a>
                       <button type="button" className="mini-btn qr" onClick={() => setQrForId(qrForId === row.id ? null : row.id)}>QR anzeigen</button>
                       {qrForId === row.id ? (
-                        (() => { const origin = typeof window !== 'undefined' ? window.location.origin : ''; return (
-                          <img className="qr" alt="QR zur Zahlungsseite" src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(origin + '/sign/payment?order=' + row.id)}`} />
-                        ); })()
+                        (() => {
+                          const origin = typeof window !== 'undefined' ? window.location.origin : ''; return (
+                            <img className="qr" alt="QR zur Zahlungsseite" src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(origin + '/sign/payment?order=' + row.id)}`} />
+                          );
+                        })()
                       ) : null}
                     </>
                   ) : null}
@@ -916,6 +922,23 @@ export default function OrdersPage() {
           <p className="sub">{greetingSub}</p>
         </div>
         <div className="actions">
+          {me?.role === "ADMIN" && (
+            <button
+              type="button"
+              className="action-btn special"
+              onClick={() => {
+                const amount = prompt("Rabatt in Euro (z.B. 50):");
+                if (!amount) return;
+                const val = parseFloat(amount.replace(",", "."));
+                if (val > 0) {
+                  sessionStorage.setItem("sb_custom_discount", Math.round(val * 100));
+                  router.push("/dashboard");
+                }
+              }}
+            >
+              Rabatt 🏷️
+            </button>
+          )}
           <Link className="action-btn" href="/dashboard">
             Neuer Auftrag
           </Link>
@@ -977,7 +1000,7 @@ export default function OrdersPage() {
               <label>👥 Teams</label>
               <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
                 <option value="all">Alle</option>
-                {Object.entries(teamMap).sort((a,b) => a[1].localeCompare(b[1], 'de')).map(([id, name]) => (
+                {Object.entries(teamMap).sort((a, b) => a[1].localeCompare(b[1], 'de')).map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </select>
@@ -993,7 +1016,7 @@ export default function OrdersPage() {
                     const name = (repMap?.[id]?.full_name) || (rows.find(rr => rr.created_by === id)?.rep_code) || id;
                     return { id, name };
                   })
-                  .sort((a,b) => a.name.localeCompare(b.name, 'de'))
+                  .sort((a, b) => a.name.localeCompare(b.name, 'de'))
                   .map(({ id, name }) => (
                     <option key={id} value={id}>{name}</option>
                   ))}
@@ -1040,7 +1063,12 @@ export default function OrdersPage() {
         .title { display:flex; flex-direction:column; gap:4px; }
         .title h1 { font-size: 30px; margin:0; font-weight:900; letter-spacing:-0.2px; }
         .title .sub { margin: 0; color:#64748b; font-size:14px; font-weight:600; }
-        .action-btn { display:inline-flex; align-items:center; height:38px; padding:0 12px; border-radius:10px; background:#0b6cf2; color:#fff; font-weight:800; border:1px solid rgba(11,108,242,.22); }
+        .title h1 { font-size: 30px; margin:0; font-weight:900; letter-spacing:-0.2px; }
+        .title .sub { margin: 0; color:#64748b; font-size:14px; font-weight:600; }
+        .actions { display:flex; gap: 10px; }
+        .action-btn { display:inline-flex; align-items:center; height:38px; padding:0 12px; border-radius:10px; background:#0b6cf2; color:#fff; font-weight:800; border:1px solid rgba(11,108,242,.22); cursor: pointer; text-decoration: none; font-size: 14px; }
+        .action-btn.special { background:#fff; color:#0b6cf2; border-color:#e5e7eb; }
+        .action-btn.special:hover { background:#f0f6ff; }
 
         .summary-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 12px; }
         .kpi { background:#ffffff; border:1px solid #eef2f7; border-radius: 14px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.04); }
@@ -1209,7 +1237,7 @@ function SalesRing({ rows }) {
   }, [rows]);
 
   const today = new Date();
-  today.setHours(0,0,0,0);
+  today.setHours(0, 0, 0, 0);
   const todayKey = dayKey(today);
   const ordersToday = counts.get(todayKey) || 0;
 

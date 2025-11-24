@@ -39,7 +39,7 @@ function PaymentForm({ orderId, billing }) {
               company: billing.billing_company || null,
             }),
           });
-        } catch {}
+        } catch { }
       }
       const { error: err } = await stripe.confirmSetup({
         elements,
@@ -136,8 +136,8 @@ export default function PaymentPage() {
             billing_company: company || b.billing_company,
           }));
           if (email) setShowEmail(true);
-        } catch {}
-        try { order_id = sessionStorage.getItem("sb_order_id") || null; } catch {}
+        } catch { }
+        try { order_id = sessionStorage.getItem("sb_order_id") || null; } catch { }
         try {
           const url = new URL(window.location.href);
           const orderParam = url.searchParams.get("order");
@@ -162,7 +162,7 @@ export default function PaymentPage() {
               }
             }
           }
-        } catch {}
+        } catch { }
         if (order_id) setOrderId(order_id);
         const res = await fetch("/api/stripe/setup-intent", {
           method: "POST",
@@ -191,7 +191,7 @@ export default function PaymentPage() {
           setPromoInfo({ code: null, discount: 0 });
           setRedeemTried(true);
         }
-      } catch {}
+      } catch { }
     })();
     if (!orderId) return;
     (async () => {
@@ -204,7 +204,7 @@ export default function PaymentPage() {
             setPromoInfo({ code: (json.order.referral_code || "").toUpperCase(), discount: json.order.discount_cents });
           }
         }
-      } catch {}
+      } catch { }
     })();
   }, [orderId]);
 
@@ -230,7 +230,7 @@ export default function PaymentPage() {
             setPromoInfo({ code: (j.order.referral_code || code).toUpperCase(), discount: j.order.discount_cents });
           }
         }
-      } catch {}
+      } catch { }
       setRedeemTried(true);
     })();
   }, [orderId, orderMeta?.discount_cents, promoInfo.code, redeemTried, billing?.billing_email]);
@@ -249,7 +249,7 @@ export default function PaymentPage() {
           if (storedCode) code = storedCode;
           const storedDiscount = sessionStorage.getItem("sb_ref_discount");
           if (storedDiscount) discount = Number(storedDiscount) || 0;
-        } catch {}
+        } catch { }
         if (typeof document !== "undefined" && !code) {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (match) code = decodeURIComponent(match[1]);
@@ -265,13 +265,13 @@ export default function PaymentPage() {
             const json = await res.json().catch(() => ({}));
             if (res.ok && json?.discount_cents) {
               discount = Number(json.discount_cents) || 0;
-              try { sessionStorage.setItem("sb_ref_discount", String(discount)); } catch {}
+              try { sessionStorage.setItem("sb_ref_discount", String(discount)); } catch { }
             }
-          } catch {}
+          } catch { }
         }
         if (cancelled) return;
         setPromoInfo({ code: code.toUpperCase(), discount });
-      } catch {}
+      } catch { }
     })();
     return () => { cancelled = true; };
   }, [promoInfo.code]);
@@ -463,7 +463,7 @@ export default function PaymentPage() {
                           }),
                         });
                       }
-                    } catch {}
+                    } catch { }
                     setEditBilling(false);
                   }}
                 >Speichern</button>
@@ -475,7 +475,7 @@ export default function PaymentPage() {
           <div className="price-box">
             <div>Grundpreis <strong>{(basePrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong></div>
             {appliedDiscount ? (
-              <div className="discount">Promo {promoCode}: −{(appliedDiscount / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</div>
+              <div className="discount">{promoCode ? `Promo ${promoCode}` : "Spezial-Rabatt"}: −{(appliedDiscount / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</div>
             ) : null}
             <div className="sum">
               Zu zahlen nach Erfolg:
@@ -497,7 +497,7 @@ export default function PaymentPage() {
             <p className="eyebrow">Zahlungsmittel</p>
             <h2>Daten sicher hinterlegen</h2>
             <p className="sub action">Damit wir starten können, hinterlege jetzt dein Zahlungsmittel. Keine Abbuchung vor Erfolg.</p>
-        </header>
+          </header>
           <Elements
             stripe={stripePromise}
             options={{
@@ -607,7 +607,7 @@ export default function PaymentPage() {
         }
       `}</style>
       <div className="page-cancel">
-        <button className="link-cancel" type="button" onClick={() => { try { window.history.back(); } catch { try { window.location.assign('/sign'); } catch {} } }}>Abbrechen und zurück</button>
+        <button className="link-cancel" type="button" onClick={() => { try { window.history.back(); } catch { try { window.location.assign('/sign'); } catch { } } }}>Abbrechen und zurück</button>
       </div>
     </main>
   );

@@ -417,15 +417,17 @@ export async function POST(req) {
       total_cents: BASE_PRICE_CENTS,
     };
 
-    if (!isInternalUser && appliedDiscount > 0) {
-      // markiere Bestellung als Referral auch im Fallback
-      orderPayload.referral_channel = "referral";
-      orderPayload.referral_code = usedPromoCode;
-      if (referralMatch?.referrer_order_id) {
-        orderPayload.referral_referrer_order_id = referralMatch.referrer_order_id;
-      }
+    if (appliedDiscount > 0 && (!isInternalUser || customDiscountCents > 0)) {
       orderPayload.discount_cents = appliedDiscount;
       orderPayload.total_cents = finalPriceCents;
+
+      if (!isInternalUser) {
+        orderPayload.referral_channel = "referral";
+        orderPayload.referral_code = usedPromoCode;
+        if (referralMatch?.referrer_order_id) {
+          orderPayload.referral_referrer_order_id = referralMatch.referrer_order_id;
+        }
+      }
     }
 
     if (rep_code && typeof rep_code === "string") {

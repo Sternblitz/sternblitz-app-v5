@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [blast, setBlast] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeDiscount, setActiveDiscount] = useState(0);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -99,6 +100,8 @@ export default function DashboardPage() {
       }
       const opt = sessionStorage.getItem("sb_selected_option");
       if (opt) setOption(opt);
+      const disc = sessionStorage.getItem("sb_custom_discount");
+      if (disc) setActiveDiscount(Number(disc));
     } catch { }
   };
 
@@ -230,28 +233,21 @@ export default function DashboardPage() {
           <div className="hero-top">
             <h1 className="headline">Hallo 👋</h1>
             <div className="hero-nav">
-              {isAdmin && (
-                <button className="nav-btn" onClick={() => {
-                  const input = prompt("Spezial-Rabatt in Euro eingeben (z.B. 50):");
-                  if (input) {
-                    const discountCents = Math.round(parseFloat(input.replace(",", ".")) * 100);
-                    if (!isNaN(discountCents) && discountCents > 0) {
-                      sessionStorage.setItem("sb_custom_discount", discountCents);
-                      alert(`Spezial-Rabatt von ${input}€ aktiviert!`);
-                      // Force re-render or notify components if needed
-                      window.dispatchEvent(new Event("sb:discount-updated"));
-                    }
-                  }
-                }}>
-                  Rabatt 🏷️
-                </button>
-              )}
               <button className="nav-btn primary" onClick={() => router.push("/dashboard/map")}>
                 Karte 🗺️
               </button>
             </div>
           </div>
         </div>
+        {activeDiscount > 0 && (
+          <div className="discount-banner">
+            🏷️ Spezial-Rabatt aktiv: <b>{activeDiscount / 100}€</b> werden abgezogen.
+            <button className="clear-disc" onClick={() => {
+              sessionStorage.removeItem("sb_custom_discount");
+              setActiveDiscount(0);
+            }}>Entfernen</button>
+          </div>
+        )}
       </section>
 
       {/* 3 Schritte */}
@@ -283,19 +279,21 @@ export default function DashboardPage() {
       </section>
 
       {/* CTA unten, elegant eingebunden */}
-      {!formOpen && (
-        <section className="bottom-cta" aria-label="Weiter zum Formular">
-          <div className="cta-card">
-            <button
-              className={`primary-btn ${blast ? "blast" : ""}`}
-              onClick={openFormWithBlast}
-            >
-              <span className="label">Jetzt loslegen</span>
-              <span className="rocket" aria-hidden>🚀</span>
-            </button>
-          </div>
-        </section>
-      )}
+      {
+        !formOpen && (
+          <section className="bottom-cta" aria-label="Weiter zum Formular">
+            <div className="cta-card">
+              <button
+                className={`primary-btn ${blast ? "blast" : ""}`}
+                onClick={openFormWithBlast}
+              >
+                <span className="label">Jetzt loslegen</span>
+                <span className="rocket" aria-hidden>🚀</span>
+              </button>
+            </div>
+          </section>
+        )
+      }
 
       {/* Trust-Leiste */}
       <section className="trust" aria-label="Vertrauen & Sicherheit">
@@ -550,6 +548,10 @@ export default function DashboardPage() {
         .nav-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); color: #0f172a; }
         .nav-btn.primary { background: #0f172a; color: #fff; border-color: #0f172a; }
         .nav-btn.primary:hover { background: #1e293b; }
+        
+        .discount-banner { margin-top: 12px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 8px 12px; border-radius: 10px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+        .clear-disc { background: transparent; border: 1px solid #059669; color: #059669; border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-weight: 700; }
+        .clear-disc:hover { background: #059669; color: #fff; }
 
         /* ————— 3) SCHRITTE ————— */
         .steps{ margin: 20px 0; padding:0; }
@@ -691,6 +693,6 @@ export default function DashboardPage() {
           .steps-row{ justify-content: center }
         }
       `}</style>
-    </main>
+    </main >
   );
 }

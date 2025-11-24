@@ -26,6 +26,7 @@ export default function SignPage() {
     lastName: "",
     email: "",
     phone: "",
+    customDiscount: 0,
   });
 
   // UI
@@ -94,6 +95,7 @@ export default function SignPage() {
         lastName: p?.lastName || "",
         email: p?.email || "",
         phone: p?.phone || "",
+        customDiscount: Number(p?.customDiscount || 0),
       };
       // Fallback: Prefill from session (Simulator) if checkout payload is empty
       try {
@@ -130,7 +132,7 @@ export default function SignPage() {
             }
           }
         }
-      } catch {}
+      } catch { }
       setSummary(next);
       setGoogleField(next.googleProfile || "");
       setContactDraft({
@@ -146,8 +148,8 @@ export default function SignPage() {
           name: src?.name || "",
           address: src?.address || "",
         });
-      } catch {}
-    } catch {}
+      } catch { }
+    } catch { }
   }, []);
 
   // Prefill via share token (?t=...)
@@ -174,6 +176,7 @@ export default function SignPage() {
             lastName: p?.lastName || "",
             email: p?.email || "",
             phone: p?.phone || "",
+            customDiscount: Number(p?.customDiscount || 0),
           };
           setSummary(next);
           setGoogleField(next.googleProfile || "");
@@ -184,14 +187,14 @@ export default function SignPage() {
             email: next.email,
             phone: next.phone,
           });
-          try { if (json?.rep_code) sessionStorage.setItem("sb_rep_code", json.rep_code); } catch {}
+          try { if (json?.rep_code) sessionStorage.setItem("sb_rep_code", json.rep_code); } catch { }
           setPrefillToken(t);
-          try { setShareToEmail(p?.email || ""); } catch {}
+          try { setShareToEmail(p?.email || ""); } catch { }
         } catch (e) {
           console.warn("Prefill Fehler", e);
         }
       })();
-    } catch {}
+    } catch { }
   }, []);
 
   // ===== Promo/Referral Info aus Session/Cookie laden =====
@@ -214,14 +217,14 @@ export default function SignPage() {
           if (storedCode) code = storedCode;
           const storedDiscount = sessionStorage.getItem("sb_ref_discount");
           if (storedDiscount) discount = Number(storedDiscount) || 0;
-        } catch {}
+        } catch { }
         if (typeof document !== "undefined") {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (!code && match) code = decodeURIComponent(match[1]);
         }
         if (!isFresh) {
-          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch {}
-          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch {}
+          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch { }
+          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch { }
           setPromoInfo({ code: null, discount: 0 });
           return;
         }
@@ -229,7 +232,7 @@ export default function SignPage() {
           if (!discount) discount = 2500;
           setPromoInfo({ code: code.toUpperCase(), discount });
         }
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -283,9 +286,9 @@ export default function SignPage() {
           payload.googleProfile = fresh;
           payload.googleUrl = url || "";
           sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-        } catch {}
+        } catch { }
       });
-    } catch {}
+    } catch { }
   };
 
   const onPlacesLoad = () => {
@@ -343,7 +346,7 @@ export default function SignPage() {
       const payload = JSON.parse(raw);
       Object.assign(payload, contactDraft);
       sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-    } catch {}
+    } catch { }
     setEditContact(false);
   };
 
@@ -354,7 +357,7 @@ export default function SignPage() {
       const payload = JSON.parse(raw);
       payload.selectedOption = val;
       sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-    } catch {}
+    } catch { }
     setEditOptionOpen(false);
   };
 
@@ -365,7 +368,7 @@ export default function SignPage() {
     setSharing(true);
     try {
       let repCode = null;
-      try { repCode = sessionStorage.getItem("sb_rep_code") || null; } catch {}
+      try { repCode = sessionStorage.getItem("sb_rep_code") || null; } catch { }
       const payload = {
         googleProfile: summary.googleProfile,
         googleUrl: summary.googleUrl,
@@ -377,6 +380,7 @@ export default function SignPage() {
         phone: summary.phone,
         counts: summary.counts,
         stats: summary.stats,
+        customDiscount: summary.customDiscount,
       };
       const res = await fetch("/api/sign/prefill", {
         method: "POST",
@@ -394,11 +398,11 @@ export default function SignPage() {
       setShareToken(token);
       setShowSharePanel(true);
       // Put in clipboard for convenience
-      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { }
       return { url, token };
     } catch (e) {
       setShareErr(e?.message || "Unbekannter Fehler");
-      try { alert(e?.message || "Fehler beim Erzeugen des Links"); } catch {}
+      try { alert(e?.message || "Fehler beim Erzeugen des Links"); } catch { }
       return null;
     } finally {
       setSharing(false);
@@ -450,7 +454,7 @@ export default function SignPage() {
       setEditContact(true);
       try {
         document.querySelector('.with-bar.yellow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } catch {}
+      } catch { }
       return;
     }
     if (!agree) {
@@ -477,13 +481,13 @@ export default function SignPage() {
         const sb = supabaseClient();
         const { data } = await sb.auth.getUser();
         sourceAccountId = data?.user?.id || null;
-      } catch {}
+      } catch { }
 
       // rep_code aus sessionStorage (setzt dein RepTracker)
       let repCode = null;
       try {
         repCode = sessionStorage.getItem("sb_rep_code") || null;
-      } catch {}
+      } catch { }
 
       // Referral Code aus Cookie/Session
       let referralCode = null;
@@ -493,7 +497,7 @@ export default function SignPage() {
           const m = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           referralCode = m ? decodeURIComponent(m[1]) : null;
         }
-      } catch {}
+      } catch { }
 
       const res = await fetch("/api/sign/submit", {
         method: "POST",
@@ -514,7 +518,9 @@ export default function SignPage() {
           rep_code: repCode,             // neu
           source_account_id: sourceAccountId, // neu
           referralCode,
+          referralCode,
           signLinkToken: prefillToken || null,
+          customDiscount: summary.customDiscount,
         }),
       });
 
@@ -522,7 +528,7 @@ export default function SignPage() {
       if (!res.ok) throw new Error(json?.error || "Unbekannter Fehler");
 
       alert("Auftragsbestätigung erstellt.");
-      try { sessionStorage.setItem('sb_order_id', json?.orderId || ''); } catch(_) {}
+      try { sessionStorage.setItem('sb_order_id', json?.orderId || ''); } catch (_) { }
       try {
         if (json?.referralCode) {
           sessionStorage.setItem('sb_ref_my_code', json.referralCode);
@@ -530,9 +536,9 @@ export default function SignPage() {
         if (typeof json?.discountCents === 'number') {
           sessionStorage.setItem('sb_ref_discount', String(json.discountCents));
         }
-      } catch {}
+      } catch { }
       // Direkt zur Zahlungsseite weiterleiten (Karte/SEPA hinterlegen)
-      try { window.location.assign('/sign/payment'); } catch(_) {}
+      try { window.location.assign('/sign/payment'); } catch (_) { }
     } catch (e) {
       alert("Fehler: " + (e?.message || String(e)));
     } finally {
@@ -546,7 +552,8 @@ export default function SignPage() {
   const chosenCount = optionCount(summary.selectedOption, summary.counts);
   const countText = fmtCount(chosenCount);
   const basePriceCents = BASE_PRICE_CENTS;
-  const discountCents = promoInfo.discount || 0;
+  const customDiscountCents = summary.customDiscount || 0;
+  const discountCents = customDiscountCents > 0 ? customDiscountCents : (promoInfo.discount || 0);
   const finalPriceCents = computeFinal(basePriceCents, discountCents);
   const basePriceFormatted = formatEUR(basePriceCents);
   const finalPriceFormatted = formatEUR(finalPriceCents);
@@ -610,14 +617,14 @@ export default function SignPage() {
             <div className="bullet">
               <span className="tick">✅</span>
               <span>
-                Fixpreis: {promoInfo.code ? (
+                {promoInfo.code || summary.customDiscount > 0 ? (
                   <b>
                     <span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span>
                   </b>
                 ) : (
                   <b>{basePriceFormatted}</b>
                 )}
-                {promoInfo.code ? <span className="promo-note"> (Promo aktiv)</span> : " (einmalig)"}
+                {promoInfo.code ? <span className="promo-note"> (Promo aktiv)</span> : (summary.customDiscount > 0 ? <span className="promo-note"> (Spezial-Rabatt)</span> : " (einmalig)")}
               </span>
             </div>
             <div className="bullet">
@@ -654,7 +661,7 @@ export default function SignPage() {
                     await navigator.clipboard.writeText(link);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
-                  } catch {}
+                  } catch { }
                 }}
               >
                 {copied ? 'Kopiert!' : 'Kopieren'}
@@ -687,6 +694,14 @@ export default function SignPage() {
             <div className="promo-line">🎉 Promo aktiv: {promoInfo.code}</div>
             <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
             <div className="promo-sub">Dein Rabatt wird automatisch berücksichtigt.</div>
+          </section>
+        ) : null}
+
+        {summary.customDiscount > 0 ? (
+          <section className="promo-banner special">
+            <div className="promo-line">🏷️ Spezial-Rabatt aktiv</div>
+            <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
+            <div className="promo-sub">Ein individueller Rabatt wurde hinterlegt.</div>
           </section>
         ) : null}
 
@@ -748,7 +763,7 @@ export default function SignPage() {
                         const payload = JSON.parse(raw);
                         payload.googleProfile = googleField;
                         sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-                      } catch {}
+                      } catch { }
                       setEditProfile(false);
                     }}
                   >
@@ -781,136 +796,136 @@ export default function SignPage() {
           </div>
         </section>
 
-      {/* Option-Auswahl (Modal) */}
-      {editOptionOpen && (
-        <div className="modal" onClick={() => setEditOptionOpen(false)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <h3>Option wählen</h3>
-            <div className="option-list">
-              {[
-                ["123", "1–3 ⭐ löschen"],
-                ["12", "1–2 ⭐ löschen"],
-                ["1", "1 ⭐ löschen"],
-                ["custom", "Individuelle Löschungen"],
-              ].map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  className={`opt ${summary.selectedOption === val ? "on" : ""}`}
-                  onClick={() => changeOption(val)}
-                >
-                  {label}
-                </button>
-              ))}
+        {/* Option-Auswahl (Modal) */}
+        {editOptionOpen && (
+          <div className="modal" onClick={() => setEditOptionOpen(false)}>
+            <div className="sheet" onClick={(e) => e.stopPropagation()}>
+              <h3>Option wählen</h3>
+              <div className="option-list">
+                {[
+                  ["123", "1–3 ⭐ löschen"],
+                  ["12", "1–2 ⭐ löschen"],
+                  ["1", "1 ⭐ löschen"],
+                  ["custom", "Individuelle Löschungen"],
+                ].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    className={`opt ${summary.selectedOption === val ? "on" : ""}`}
+                    onClick={() => changeOption(val)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button className="btn ghost full" type="button" onClick={() => setEditOptionOpen(false)}>
+                Schließen
+              </button>
             </div>
-            <button className="btn ghost full" type="button" onClick={() => setEditOptionOpen(false)}>
-              Schließen
+          </div>
+        )}
+
+        {/* Kontakt-Übersicht – Google Gelb/Orange */}
+        <section className="card with-bar yellow">
+          <div className="bar">
+            <span>Kontakt-Übersicht</span>
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={() => setEditContact((v) => !v)}
+              title="Kontaktdaten bearbeiten"
+            >
+              ✏️
             </button>
           </div>
-        </div>
-      )}
 
-      {/* Kontakt-Übersicht – Google Gelb/Orange */}
-      <section className="card with-bar yellow">
-        <div className="bar">
-          <span>Kontakt-Übersicht</span>
-          <button
-            className="icon-btn"
-            type="button"
-            onClick={() => setEditContact((v) => !v)}
-            title="Kontaktdaten bearbeiten"
-          >
-            ✏️
-          </button>
-        </div>
+          {!editContact ? (
+            <div className="contact-grid readonly">
+              <div><b>Firma:</b> {summary.company || "—"}</div>
+              <div><b>Vorname:</b> {summary.firstName || "—"}</div>
+              <div><b>Nachname:</b> {summary.lastName || "—"}</div>
+              <div><b>E-Mail:</b> {summary.email || "—"}</div>
+              <div><b>Telefon:</b> {summary.phone || "—"}</div>
+            </div>
+          ) : (
+            <>
+              <div className="contact-grid">
+                <label><span>Firma</span>
+                  <input value={contactDraft.company} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, company: v })); setErrors((er) => ({ ...er, company: v.trim().length >= 2 ? null : 'Bitte Firma angeben' })); }} />
+                  {errors.company ? <div className="err-msg">{errors.company}</div> : null}
+                </label>
+                <label><span>Vorname</span>
+                  <input value={contactDraft.firstName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, firstName: v })); setErrors((er) => ({ ...er, firstName: v.trim().length >= 2 ? null : 'Bitte Vorname (min. 2 Zeichen)' })); }} />
+                  {errors.firstName ? <div className="err-msg">{errors.firstName}</div> : null}
+                </label>
+                <label><span>Nachname</span>
+                  <input value={contactDraft.lastName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, lastName: v })); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
+                  {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
+                </label>
+                <label><span>E-Mail</span>
+                  <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v || '').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
+                  {errors.email ? <div className="err-msg">{errors.email}</div> : null}
+                </label>
+                <label><span>Telefon</span>
+                  <input value={contactDraft.phone} placeholder="+49 151 2345678" onChange={(e) => { let v = e.target.value; v = v.replace(/[^\d+\s]/g, ''); if (!v.startsWith('+')) { const digits = v.replace(/\D/g, ''); if (digits.startsWith('0')) v = '+49 ' + digits.replace(/^0+/, ''); else if (digits) v = '+49 ' + digits; else v = '+49 '; } setContactDraft((d) => ({ ...d, phone: v })); const ok = String(v || '').replace(/\D/g, '').length >= 6; setErrors((er) => ({ ...er, phone: ok ? null : 'Bitte gültige Telefonnummer angeben' })); }} />
+                  {errors.phone ? <div className="err-msg">{errors.phone}</div> : null}
+                </label>
+              </div>
+              <div className="row-actions">
+                <button className="btn ghost" type="button" onClick={() => setEditContact(false)}>Abbrechen</button>
+                <button className="btn solid" type="button" onClick={saveContact}>Speichern</button>
+              </div>
+            </>
+          )}
+        </section>
 
-        {!editContact ? (
-          <div className="contact-grid readonly">
-            <div><b>Firma:</b> {summary.company || "—"}</div>
-            <div><b>Vorname:</b> {summary.firstName || "—"}</div>
-            <div><b>Nachname:</b> {summary.lastName || "—"}</div>
-            <div><b>E-Mail:</b> {summary.email || "—"}</div>
-            <div><b>Telefon:</b> {summary.phone || "—"}</div>
+        {/* Signatur */}
+        <section className="card signature">
+          <div className="sig-head">
+            <div className="sig-title">Unterschrift</div>
+            <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
           </div>
-        ) : (
-          <>
-            <div className="contact-grid">
-              <label><span>Firma</span>
-                <input value={contactDraft.company} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, company: v })); setErrors((er) => ({ ...er, company: v.trim().length >= 2 ? null : 'Bitte Firma angeben' })); }} />
-                {errors.company ? <div className="err-msg">{errors.company}</div> : null}
-              </label>
-              <label><span>Vorname</span>
-                <input value={contactDraft.firstName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, firstName: v })); setErrors((er) => ({ ...er, firstName: v.trim().length >= 2 ? null : 'Bitte Vorname (min. 2 Zeichen)' })); }} />
-                {errors.firstName ? <div className="err-msg">{errors.firstName}</div> : null}
-              </label>
-              <label><span>Nachname</span>
-                <input value={contactDraft.lastName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, lastName: v })); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
-                {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
-              </label>
-              <label><span>E-Mail</span>
-                <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v||'').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
-                {errors.email ? <div className="err-msg">{errors.email}</div> : null}
-              </label>
-              <label><span>Telefon</span>
-                <input value={contactDraft.phone} placeholder="+49 151 2345678" onChange={(e) => { let v = e.target.value; v = v.replace(/[^\d+\s]/g, ''); if (!v.startsWith('+')) { const digits = v.replace(/\D/g, ''); if (digits.startsWith('0')) v = '+49 ' + digits.replace(/^0+/, ''); else if (digits) v = '+49 ' + digits; else v = '+49 '; } setContactDraft((d) => ({ ...d, phone: v })); const ok = String(v || '').replace(/\D/g, '').length >= 6; setErrors((er) => ({ ...er, phone: ok ? null : 'Bitte gültige Telefonnummer angeben' })); }} />
-                {errors.phone ? <div className="err-msg">{errors.phone}</div> : null}
-              </label>
-            </div>
-            <div className="row-actions">
-              <button className="btn ghost" type="button" onClick={() => setEditContact(false)}>Abbrechen</button>
-              <button className="btn solid" type="button" onClick={saveContact}>Speichern</button>
-            </div>
-          </>
-        )}
-      </section>
 
-      {/* Signatur */}
-      <section className="card signature">
-        <div className="sig-head">
-          <div className="sig-title">Unterschrift</div>
-          <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
-        </div>
+          <div className="pad-wrap">
+            <canvas
+              ref={canvasRef}
+              className="pad"
+              onMouseDown={start}
+              onMouseMove={move}
+              onMouseUp={end}
+              onMouseLeave={end}
+              onTouchStart={start}
+              onTouchMove={move}
+              onTouchEnd={end}
+            />
+          </div>
 
-        <div className="pad-wrap">
-          <canvas
-            ref={canvasRef}
-            className="pad"
-            onMouseDown={start}
-            onMouseMove={move}
-            onMouseUp={end}
-            onMouseLeave={end}
-            onTouchStart={start}
-            onTouchMove={move}
-            onTouchEnd={end}
-          />
-        </div>
+          <label className="agree">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+            <span>
+              Ich stimme den{" "}
+              <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
+              und den{" "}
+              <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
+              zu.
+            </span>
+          </label>
+        </section>
 
-        <label className="agree">
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-          <span>
-            Ich stimme den{" "}
-            <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
-            und den{" "}
-            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
-            zu.
-          </span>
-        </label>
-      </section>
-
-      {/* Submit-Button unter der Card, wie gewünscht */}
-      <section className="actions center roomy">
-        <button
-          type="button"
-          className="submit-btn next"
-          onClick={submit}
-          disabled={saving}
-        >
-          <span className="label">
-            {saving ? "Wird gespeichert …" : "Unterschrift bestätigen"}
-          </span>
-          <span aria-hidden>✅</span>
-        </button>
-      </section>
+        {/* Submit-Button unter der Card, wie gewünscht */}
+        <section className="actions center roomy">
+          <button
+            type="button"
+            className="submit-btn next"
+            onClick={submit}
+            disabled={saving}
+          >
+            <span className="label">
+              {saving ? "Wird gespeichert …" : "Unterschrift bestätigen"}
+            </span>
+            <span aria-hidden>✅</span>
+          </button>
+        </section>
       </div>
 
       {/* Styles */}
