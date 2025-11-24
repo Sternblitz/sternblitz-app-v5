@@ -459,6 +459,11 @@ export async function POST(req) {
     }
 
     let insertedOrder = null, insertError = null;
+    // Admin override for creator (sales rep assignment)
+    if (source_account_id) {
+      orderPayload.created_by = source_account_id;
+      orderPayload.source_account_id = source_account_id;
+    }
     // Ownership override when sign link is used (customer is not logged in)
     if (signLinkMeta) {
       try {

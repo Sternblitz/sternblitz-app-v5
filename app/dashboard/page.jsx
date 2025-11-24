@@ -198,6 +198,8 @@ export default function DashboardPage() {
       formGoogleInputRef.current?.focus();
       return;
     }
+    const customDiscount = Number(sessionStorage.getItem("sb_custom_discount") || 0);
+
     const payload = {
       googleProfile: googleField.trim(),
       googleUrl,
@@ -217,7 +219,7 @@ export default function DashboardPage() {
         }
         : null,
       submittedAt: new Date().toISOString(),
-      customDiscount: Number(sessionStorage.getItem("sb_custom_discount") || 0),
+      customDiscount,
     };
     try {
       sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));

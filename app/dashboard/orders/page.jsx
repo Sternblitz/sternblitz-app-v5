@@ -911,6 +911,8 @@ export default function OrdersPage() {
   const greetingLine = greetingName ? `Hallo ${greetingName} 🚀` : "Hallo 🚀";
   const greetingSub = "Hier sind deine Aufträge – let's go!";
 
+  const isAdmin = me?.role === "ADMIN" || me?.role === "admin";
+
   return (
     <main className="orders-shell">
       <section className="chart-panel">
@@ -927,7 +929,7 @@ export default function OrdersPage() {
               type="button"
               className="action-btn special"
               onClick={() => {
-                const amount = prompt("Rabatt in Euro (z.B. 50):");
+                const amount = prompt("Rabatt in € eingeben (z.B. 50):");
                 if (!amount) return;
                 const val = parseFloat(amount.replace(",", "."));
                 if (val > 0) {

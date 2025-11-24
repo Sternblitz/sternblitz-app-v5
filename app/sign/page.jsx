@@ -24,10 +24,13 @@ export default function SignPage() {
     company: "",
     firstName: "",
     lastName: "",
+    lastName: "",
     email: "",
     phone: "",
     customDiscount: 0,
   });
+
+  const [currentUser, setCurrentUser] = useState(null);
 
   // UI
   const [agree, setAgree] = useState(false);
@@ -152,6 +155,17 @@ export default function SignPage() {
     } catch { }
   }, []);
 
+  // Check user session for UI restrictions
+  useEffect(() => {
+    (async () => {
+      try {
+        const sb = supabaseClient();
+        const { data } = await sb.auth.getUser();
+        setCurrentUser(data?.user || null);
+      } catch { }
+    })();
+  }, []);
+
   // Prefill via share token (?t=...)
   useEffect(() => {
     try {
@@ -265,8 +279,13 @@ export default function SignPage() {
   // ===== Google Places (Profil-Edit) =====
   const initPlaces = () => {
     try {
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        // Retry if not ready
+        setTimeout(initPlaces, 500);
+        return;
+      }
+      if (!formGoogleInputRef.current) return;
       const g = window.google;
-      if (!g?.maps?.places || !formGoogleInputRef.current) return;
       const ac = new g.maps.places.Autocomplete(formGoogleInputRef.current, {
         types: ["establishment"],
         fields: ["name", "formatted_address", "url", "place_id"],
@@ -379,6 +398,7 @@ export default function SignPage() {
         email: summary.email,
         phone: summary.phone,
         counts: summary.counts,
+        stats: summary.stats,
         stats: summary.stats,
         customDiscount: summary.customDiscount,
       };
@@ -518,7 +538,6 @@ export default function SignPage() {
           rep_code: repCode,             // neu
           source_account_id: sourceAccountId, // neu
           referralCode,
-          referralCode,
           signLinkToken: prefillToken || null,
           customDiscount: summary.customDiscount,
         }),
@@ -568,16 +587,18 @@ export default function SignPage() {
       <div className="page-container">
         {/* Action Bar (oben rechts) */}
         <div className="action-bar">
-          <div className="actions">
-            <button type="button" className="btn share" onClick={() => { setShowSharePanel(true); createShareLink(); }} disabled={sharing}>
-              <span className="emoji" aria-hidden>🔗</span>
-              {sharing ? 'Erzeuge Link…' : 'Link teilen'}
-            </button>
-            <button type="button" className="btn email" onClick={() => { setShowEmailShare((v) => !v); if (!shareUrl) createShareLink(); }}>
-              <span className="emoji" aria-hidden>✉️</span>
-              Per E‑Mail senden
-            </button>
-          </div>
+          {currentUser ? (
+            <div className="actions">
+              <button type="button" className="btn share" onClick={() => { setShowSharePanel(true); createShareLink(); }} disabled={sharing}>
+                <span className="emoji" aria-hidden>🔗</span>
+                {sharing ? 'Erzeuge Link…' : 'Link teilen'}
+              </button>
+              <button type="button" className="btn email" onClick={() => { setShowEmailShare((v) => !v); if (!shareUrl) createShareLink(); }}>
+                <span className="emoji" aria-hidden>✉️</span>
+                Per E‑Mail senden
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {showEmailShare && (
