@@ -163,27 +163,196 @@ export default function MapPage() {
         setMarkers(newMarkers);
     };
 
-    // Search Nearby (Visible Area)
+    // Translate Types
+    const translateType = (types) => {
+        if (!types || !types.length) return "Geschäft";
+        const map = {
+            accounting: "Buchhaltung",
+            airport: "Flughafen",
+            amusement_park: "Freizeitpark",
+            aquarium: "Aquarium",
+            art_gallery: "Kunstgalerie",
+            atm: "Geldautomat",
+            bakery: "Bäckerei",
+            bank: "Bank",
+            bar: "Bar",
+            beauty_salon: "Schönheitssalon",
+            bicycle_store: "Fahrradladen",
+            book_store: "Buchhandlung",
+            bowling_alley: "Bowlingbahn",
+            bus_station: "Busbahnhof",
+            cafe: "Café",
+            campground: "Campingplatz",
+            car_dealer: "Autohändler",
+            car_rental: "Mietwagen",
+            car_repair: "Autowerkstatt",
+            car_wash: "Autowaschanlage",
+            casino: "Casino",
+            cemetery: "Friedhof",
+            church: "Kirche",
+            city_hall: "Rathaus",
+            clothing_store: "Bekleidungsgeschäft",
+            convenience_store: "Gemischtwarenladen",
+            courthouse: "Gericht",
+            dentist: "Zahnarzt",
+            department_store: "Kaufhaus",
+            doctor: "Arzt",
+            drugstore: "Drogerie",
+            electrician: "Elektriker",
+            electronics_store: "Elektronikmarkt",
+            embassy: "Botschaft",
+            fire_station: "Feuerwehr",
+            florist: "Blumenladen",
+            funeral_home: "Bestattungsunternehmen",
+            furniture_store: "Möbelhaus",
+            gas_station: "Tankstelle",
+            gym: "Fitnessstudio",
+            hair_care: "Friseur",
+            hardware_store: "Baumarkt",
+            hindu_temple: "Hindu-Tempel",
+            home_goods_store: "Haushaltswaren",
+            hospital: "Krankenhaus",
+            insurance_agency: "Versicherung",
+            jewelry_store: "Juwelier",
+            laundry: "Wäscherei",
+            lawyer: "Anwalt",
+            library: "Bibliothek",
+            light_rail_station: "S-Bahn",
+            liquor_store: "Spirituosenladen",
+            local_government_office: "Behörde",
+            locksmith: "Schlüsseldienst",
+            lodging: "Unterkunft",
+            meal_delivery: "Lieferservice",
+            meal_takeaway: "Imbiss",
+            mosque: "Moschee",
+            movie_rental: "Videothek",
+            movie_theater: "Kino",
+            moving_company: "Umzugsunternehmen",
+            museum: "Museum",
+            night_club: "Nachtclub",
+            painter: "Maler",
+            park: "Park",
+            parking: "Parkplatz",
+            pet_store: "Tierhandlung",
+            pharmacy: "Apotheke",
+            physiotherapist: "Physiotherapeut",
+            plumber: "Klempner",
+            police: "Polizei",
+            post_office: "Post",
+            primary_school: "Grundschule",
+            real_estate_agency: "Immobilienmakler",
+            restaurant: "Restaurant",
+            roofing_contractor: "Dachdecker",
+            rv_park: "Wohnmobilstellplatz",
+            school: "Schule",
+            secondary_school: "Weiterführende Schule",
+            shoe_store: "Schuhgeschäft",
+            shopping_mall: "Einkaufszentrum",
+            spa: "Spa",
+            stadium: "Stadion",
+            storage: "Lager",
+            store: "Geschäft",
+            subway_station: "U-Bahn",
+            supermarket: "Supermarkt",
+            synagogue: "Synagoge",
+            taxi_stand: "Taxistand",
+            tourist_attraction: "Sehenswürdigkeit",
+            train_station: "Bahnhof",
+            transit_station: "Haltestelle",
+            travel_agency: "Reisebüro",
+            university: "Universität",
+            veterinary_care: "Tierarzt",
+            zoo: "Zoo",
+        };
+        for (const t of types) {
+            if (map[t]) return map[t];
+        }
+        return "Geschäft";
+    };
+
+    // Search Nearby (Smart Street Scan)
     const searchNearby = () => {
         if (!mapInstance || !placesService) return;
+        const center = mapInstance.getCenter();
+        const zoom = mapInstance.getZoom();
+        if (!center || !zoom) return;
 
-        const bounds = mapInstance.getBounds();
-        if (!bounds) return;
+        // Calculate "Street Scan" radius based on zoom
+        // D2D usually happens at zoom 16-19.
+        // Zoom 18 ~ 100m radius visually.
+        // We want high density, so we keep radius small to force "all" results.
+        // If zoomed out (e.g. 14), we still want "local" density at the center, not a huge city-wide search.
 
-        const request = {
-            bounds: bounds,
-            type: "establishment",
-        };
+        // Base radius in meters
+        let radius = 150;
+        if (zoom <= 15) radius = 500;
+        else if (zoom === 16) radius = 300;
+        else if (zoom === 17) radius = 200;
+        else if (zoom >= 18) radius = 120;
 
-        placesService.nearbySearch(request, (results, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                const processed = results.map(p => {
+        // 5-Point Pattern (Quincunx) to maximize coverage in the center
+        // Center + 4 overlapping circles at N, S, E, W
+        // Offset should be slightly less than radius to ensure overlap
+        const offsetMeters = radius * 0.8;
+        const rEarth = 6378137; // Earth radius in meters
+        const pi = Math.PI;
+        const lat = center.lat();
+        const lng = center.lng();
+
+        const latOffset = (offsetMeters / rEarth) * (180 / pi);
+        const lngOffset = (offsetMeters / rEarth) * (180 / pi) / Math.cos(lat * pi / 180);
+
+        const centers = [
+            { lat: lat, lng: lng }, // Center
+            { lat: lat + latOffset, lng: lng }, // North
+            { lat: lat - latOffset, lng: lng }, // South
+            { lat: lat, lng: lng + lngOffset }, // East
+            { lat: lat, lng: lng - lngOffset }, // West
+        ];
+
+        let allResults = [];
+        let completed = 0;
+
+        const checkDone = () => {
+            completed++;
+            if (completed === centers.length) {
+                // Deduplicate
+                const unique = new Map();
+                allResults.forEach(p => unique.set(p.place_id, p));
+                const processed = Array.from(unique.values()).map(p => {
                     const loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
                     const dist = myLoc ? getDistance(myLoc, loc) : null;
-                    return { ...p, dist, loc };
+                    return { ...p, dist, loc, category: translateType(p.types) };
                 });
                 setSearchResults(processed);
             }
+        };
+
+        centers.forEach(c => {
+            const request = {
+                location: c,
+                radius: radius, // Tight radius for high density
+                type: "establishment",
+            };
+
+            let pageCount = 0;
+            const callback = (results, status, pagination) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                    allResults.push(...results);
+                }
+
+                // Fetch up to 3 pages (60 results) per circle
+                if (pagination && pagination.hasNextPage && pageCount < 2) {
+                    pageCount++;
+                    setTimeout(() => {
+                        pagination.nextPage();
+                    }, 2000);
+                } else {
+                    checkDone();
+                }
+            };
+
+            placesService.nearbySearch(request, callback);
         });
     };
 
@@ -383,7 +552,7 @@ export default function MapPage() {
                             >
                                 <div className="pc-left">
                                     <div className="pc-name">{p.name}</div>
-                                    <div className="pc-sub">{p.vicinity}</div>
+                                    <div className="pc-sub">{p.category ? <span className="cat-badge">{p.category}</span> : null} {p.vicinity}</div>
                                     <div className="pc-meta">
                                         <span className={`pc-rating ${isTarget ? 'bad' : 'good'}`}>
                                             {p.rating ? p.rating.toFixed(1) : "-"} ⭐ <span className="pc-count">({p.user_ratings_total || 0})</span>
@@ -430,6 +599,7 @@ export default function MapPage() {
                                         📞 {selectedPlace.formatted_phone_number}
                                     </a>
                                 )}
+                                {selectedPlace.category && <div className="d-cat">{selectedPlace.category}</div>}
                             </div>
                             {/* Navigation Button */}
                             <a
@@ -583,6 +753,8 @@ export default function MapPage() {
                 .d-header h2 { margin: 0 0 8px; font-size: 22px; font-weight: 800; color: #0f172a; }
                 .d-meta { display: flex; flex-direction: column; gap: 4px; align-items: center; font-size: 15px; color: #64748b; }
                 .d-phone { color: #0b6cf2; text-decoration: none; font-weight: 600; background: #eff6ff; padding: 4px 12px; border-radius: 99px; margin-top: 4px; display: inline-block; }
+                .d-cat { font-size: 13px; font-weight: 600; color: #64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 6px; margin-top: 6px; }
+                .cat-badge { font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; margin-right: 6px; vertical-align: middle; }
                 .btn-nav {
                     display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
                     background: #f1f5f9; color: #0f172a; padding: 8px 16px; border-radius: 99px;
