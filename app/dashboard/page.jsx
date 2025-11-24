@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import LiveSimulator from "../../components/LiveSimulator";
+import { supabase as supabaseClient } from "@/lib/supabaseClient";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,34 @@ export default function DashboardPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [blast, setBlast] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const supabase = supabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        console.log("User found:", user.id);
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        console.log("Profile check:", profile, error);
+
+        if (profile?.role === "ADMIN" || profile?.role === "admin") {
+          console.log("User is admin");
+          setIsAdmin(true);
+        } else {
+          console.log("User is NOT admin");
+        }
+      } else {
+        console.log("No user logged in");
+      }
+    };
+    checkAdmin();
+  }, []);
 
   const [option, setOption] = useState("123"); // "123" | "12" | "1" | "custom"
 
@@ -70,7 +99,7 @@ export default function DashboardPage() {
       }
       const opt = sessionStorage.getItem("sb_selected_option");
       if (opt) setOption(opt);
-    } catch {}
+    } catch { }
   };
 
   // Events vom Simulator (ohne auto-öffnen)
@@ -94,7 +123,7 @@ export default function DashboardPage() {
       });
       try {
         sessionStorage.setItem("sb_stats", JSON.stringify(e.detail));
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener("sb:simulator-start", onStart);
@@ -145,16 +174,16 @@ export default function DashboardPage() {
             "sb_selected_profile",
             JSON.stringify({ name, address, url })
           );
-        } catch {}
+        } catch { }
       });
-    } catch {}
+    } catch { }
   }, [formOpen]);
 
   const onOptionChange = (val) => {
     setOption(val);
     try {
       sessionStorage.setItem("sb_selected_option", val);
-    } catch {}
+    } catch { }
   };
 
   const fmtCount = (n) => (Number.isFinite(n) ? n.toLocaleString() : "—");
@@ -179,16 +208,17 @@ export default function DashboardPage() {
       counts, // für Prefill der /sign Seite
       stats: stats?.breakdown
         ? {
-            totalReviews: stats.totalReviews,
-            averageRating: stats.averageRating,
-            breakdown: stats.breakdown,
-          }
+          totalReviews: stats.totalReviews,
+          averageRating: stats.averageRating,
+          breakdown: stats.breakdown,
+        }
         : null,
       submittedAt: new Date().toISOString(),
+      customDiscount: Number(sessionStorage.getItem("sb_custom_discount") || 0),
     };
     try {
       sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-    } catch {}
+    } catch { }
     router.push("/sign");
   };
 
@@ -197,8 +227,29 @@ export default function DashboardPage() {
       {/* Hero-Bereich über dem Simulator */}
       <section className="hero">
         <div className="hero-inner">
-          <div className="hero-copy">
+          <div className="hero-top">
             <h1 className="headline">Hallo 👋</h1>
+            <div className="hero-nav">
+              {isAdmin && (
+                <button className="nav-btn" onClick={() => {
+                  const input = prompt("Spezial-Rabatt in Euro eingeben (z.B. 50):");
+                  if (input) {
+                    const discountCents = Math.round(parseFloat(input.replace(",", ".")) * 100);
+                    if (!isNaN(discountCents) && discountCents > 0) {
+                      sessionStorage.setItem("sb_custom_discount", discountCents);
+                      alert(`Spezial-Rabatt von ${input}€ aktiviert!`);
+                      // Force re-render or notify components if needed
+                      window.dispatchEvent(new Event("sb:discount-updated"));
+                    }
+                  }
+                }}>
+                  Rabatt 🏷️
+                </button>
+              )}
+              <button className="nav-btn primary" onClick={() => router.push("/dashboard/map")}>
+                Karte 🗺️
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -489,8 +540,16 @@ export default function DashboardPage() {
         /* ————— 2) HERO ————— */
         .hero { margin-top:20px; padding:0; }
         .hero-inner{ max-width:1208px; margin:0 auto; padding: 0 4px; }
-        .hero-copy{ max-width: 860px; }
+        .hero-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
         .headline{ margin:0; font-size: 40px; line-height:1.1; letter-spacing:-.3px }
+        .hero-nav { display: flex; gap: 10px; }
+        .nav-btn {
+            background: #fff; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 12px;
+            font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.2s; font-size: 14px;
+        }
+        .nav-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); color: #0f172a; }
+        .nav-btn.primary { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .nav-btn.primary:hover { background: #1e293b; }
 
         /* ————— 3) SCHRITTE ————— */
         .steps{ margin: 20px 0; padding:0; }

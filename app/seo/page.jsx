@@ -396,8 +396,13 @@ export default function SignPage() {
           signLinkToken: prefillToken || null,
         }),
       });
-
-      const json = await res.json();
+      const raw = await res.text();
+      let json = null;
+      try {
+        json = raw ? JSON.parse(raw) : null;
+      } catch (err) {
+        if (!res.ok) throw new Error(raw || err?.message || "Serverfehler");
+      }
       if (!res.ok) throw new Error(json?.error || "Unbekannter Fehler");
 
       alert("Auftragsbestätigung erteilt – bitte Zahlungsdaten hinterlegen, damit wir loslegen.");

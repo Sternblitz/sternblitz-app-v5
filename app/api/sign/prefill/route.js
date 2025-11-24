@@ -30,6 +30,7 @@ function pickSafePayload(input = {}) {
     "counts",
     "stats",
     "locks", // optional: { googleProfile: true, selectedOption: true, ... }
+    "customDiscount", // admin override
   ];
   for (const k of allow) if (k in input) out[k] = input[k];
   return out;

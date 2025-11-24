@@ -39,16 +39,16 @@ function toWinAnsi(text = "") {
 
 function labelFor(opt) {
   return opt === "123" ? "1–3 Sterne löschen"
-       : opt === "12"  ? "1–2 Sterne löschen"
-       : opt === "1"   ? "1 Stern löschen"
-       : "Individuelle Löschungen";
+    : opt === "12" ? "1–2 Sterne löschen"
+      : opt === "1" ? "1 Stern löschen"
+        : "Individuelle Löschungen";
 }
 
 function chosenCount(selectedOption, counts) {
   if (!counts) return null;
   if (selectedOption === "123") return counts.c123 ?? null;
-  if (selectedOption === "12")  return counts.c12  ?? null;
-  if (selectedOption === "1")   return counts.c1   ?? null;
+  if (selectedOption === "12") return counts.c12 ?? null;
+  if (selectedOption === "1") return counts.c1 ?? null;
   return null;
 }
 
@@ -84,7 +84,7 @@ async function ensureReferralCode(admin, orderId, firstName, lastName) {
       .eq("referrer_order_id", orderId)
       .maybeSingle();
     if (existing?.code) return existing.code;
-  } catch {}
+  } catch { }
 
   const base = referralBase(firstName, lastName);
   let candidate = base.length >= 5 ? base : `${base}${randomSuffix(3)}`;
@@ -165,107 +165,7 @@ function sanitizeStats(stats) {
 }
 
 // ---------- PDF ----------
-async function buildPdf(p, sigBytes, priceInfo = {}) {
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595, 842]); // A4
-  const { height } = page.getSize();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const draw = (txt, opts) => page.drawText(toWinAnsi(txt), opts);
-
-  const discountCents = Number(priceInfo.discountCents || 0);
-  const finalCents = Number(priceInfo.finalCents || (BASE_PRICE_CENTS - discountCents));
-  const pricePromoCode = priceInfo.promoCode ? String(priceInfo.promoCode).toUpperCase() : null;
-  const priceLine = discountCents > 0
-    ? `Fixpreis: ${fmtEUR(BASE_PRICE_CENTS)} → ${fmtEUR(finalCents)}${pricePromoCode ? ` (Promo ${pricePromoCode})` : " (Promo aktiv)"}`
-    : `Fixpreis: ${fmtEUR(BASE_PRICE_CENTS)} (einmalig)`;
-
-  let y = height - 70;
-  draw("Auftragsbestätigung Sternblitz", { x: 50, y, font: bold, size: 20, color: rgb(0,0,0) });
-
-  y -= 20;
-  draw("Hiermit bestätige ich den Auftrag zur Löschung meiner negativen Google-Bewertungen.", { x: 50, y, font, size: 11, color: rgb(0,0,0) });
-
-  y -= 25;
-  for (const b of [
-    priceLine,
-    "Zahlung erst nach Löschung (von mind. 90 % der Bewertungen)",
-    "Dauerhafte Entfernung",
-  ]) {
-    draw("• " + b, { x: 50, y, font, size: 11, color: rgb(0,0,0) });
-    y -= 16;
-  }
-
-  y -= 10;
-  draw("Zusammenfassung", { x: 50, y, font: bold, size: 12, color: rgb(0,0,0) });
-  y -= 16;
-
-  const lines = [
-    ["Preis", discountCents > 0
-      ? `${fmtEUR(BASE_PRICE_CENTS)} → ${fmtEUR(finalCents)}${pricePromoCode ? ` (Promo ${pricePromoCode})` : ""}`
-      : `${fmtEUR(BASE_PRICE_CENTS)} (einmalig)`],
-    ...(pricePromoCode ? [["Promo‑Code", `angewendet: ${pricePromoCode}`]] : []),
-    ["Google-Profil", p.googleProfile],
-    ["Bewertungen", labelFor(p.selectedOption)],
-    ["Firma", p.company],
-    ["Vorname", p.firstName],
-    ["Nachname", p.lastName],
-    ["E-Mail", p.email],
-    ["Telefon", p.phone],
-  ];
-  for (const [k, v] of lines) {
-    draw(`${k}:`, { x: 50, y, font: bold, size: 10, color: rgb(0,0,0) });
-    draw(String(v ?? "—"), { x: 180, y, font, size: 10, color: rgb(0,0,0) });
-    y -= 14;
-  }
-
-  const picked = chosenCount(p.selectedOption, p.counts);
-  y -= 6;
-  draw("Gewählte Löschung:", { x: 50, y, font: bold, size: 10, color: rgb(0,0,0) });
-  draw(
-    `${labelFor(p.selectedOption)}${picked != null ? ` — Entfernte: ${Number(picked).toLocaleString("de-DE")}` : ""}`,
-    { x: 180, y, font, size: 10, color: rgb(0,0,0) }
-  );
-  y -= 14;
-
-  if (p.counts) {
-    const c123 = Number(p.counts.c123 ?? 0).toLocaleString("de-DE");
-    const c12  = Number(p.counts.c12  ?? 0).toLocaleString("de-DE");
-    const c1   = Number(p.counts.c1   ?? 0).toLocaleString("de-DE");
-    draw("Zähler gesamt:", { x: 50, y, font: bold, size: 10, color: rgb(0,0,0) });
-    draw(`1–3: ${c123}   |   1–2: ${c12}   |   1: ${c1}`, { x: 180, y, font, size: 10, color: rgb(0,0,0) });
-    y -= 14;
-  }
-
-  // Rechtlicher Hinweis (über der Unterschrift)
-  y -= 8;
-  draw("Rechtlicher Hinweis:", { x: 50, y, font: bold, size: 10, color: rgb(0,0,0) });
-  y -= 14;
-  draw(
-    "Mit meiner Unterschrift bestätige ich, die AGB und die Datenschutzerklärung gelesen und akzeptiert zu haben.",
-    { x: 50, y, font, size: 10, color: rgb(0,0,0) }
-  );
-  y -= 14;
-  draw(
-    "Hinweis: Beide Dokumente sind der Bestätigungs-E-Mail als AGB.pdf und Datenschutzbestimmungen.pdf angehängt.",
-    { x: 50, y, font, size: 10, color: rgb(0,0,0) }
-  );
-  y -= 12;
-
-  y -= 12;
-  draw("Unterschrift:", { x: 50, y, font: bold, size: 11, color: rgb(0,0,0) });
-  y -= 100;
-
-  if (sigBytes?.length) {
-    const png = await pdf.embedPng(sigBytes);
-    page.drawImage(png, { x: 50, y, width: 200, height: 100 });
-  }
-
-  y -= 20;
-  draw(`Datum: ${new Date().toLocaleString("de-DE")}`, { x: 50, y, font, size: 10, color: rgb(0,0,0) });
-
-  return await pdf.save();
-}
+import { buildPdf } from "@/lib/pdfGenerator";
 
 // ---------- Handler ----------
 export async function POST(req) {
@@ -288,6 +188,7 @@ export async function POST(req) {
       source_account_id = null, // neu: wird mitgespeichert
       referralCode = null,
       signLinkToken = null,
+      customDiscount = 0,
     } = body || {};
 
     const normalizedGoogleProfile =
@@ -386,13 +287,18 @@ export async function POST(req) {
         const c = cookies();
         const cookieVal = c?.get?.("sb_ref")?.value || null;
         if (cookieVal) normalizedReferralCode = String(cookieVal).trim().toUpperCase();
-      } catch {}
+      } catch { }
     }
     // Interne Nutzer: niemals Promo anwenden
     if (isInternalUser) normalizedReferralCode = "";
     let referralMatch = null;
     let appliedDiscount = 0;
-    if (normalizedReferralCode) {
+    const customDiscountCents = Number(customDiscount || 0);
+
+    if (customDiscountCents > 0) {
+      appliedDiscount = customDiscountCents;
+      normalizedReferralCode = "";
+    } else if (normalizedReferralCode) {
       try {
         const { data: rc } = await admin
           .from("referral_codes")
@@ -543,7 +449,7 @@ export async function POST(req) {
           .maybeSingle();
         if (refOrg?.org_id && !orderPayload.org_id) orderPayload.org_id = refOrg.org_id;
         if (refOrg?.team_id && !orderPayload.team_id) orderPayload.team_id = refOrg.team_id;
-      } catch {}
+      } catch { }
     }
     if (!user && !orderPayload.org_id) {
       const DEFAULT_ORG_ID = process.env.DEFAULT_ORG_ID || process.env.NEXT_PUBLIC_DEFAULT_ORG_ID || null;
@@ -562,7 +468,7 @@ export async function POST(req) {
         if (signLinkMeta.org_id) orderPayload.org_id = signLinkMeta.org_id;
         if (signLinkMeta.team_id) orderPayload.team_id = signLinkMeta.team_id;
         if (!orderPayload.rep_code && signLinkMeta.rep_code) orderPayload.rep_code = signLinkMeta.rep_code;
-      } catch {}
+      } catch { }
     }
     if (user) {
       const { data, error } = await supabase
@@ -742,7 +648,7 @@ export async function POST(req) {
             if (!res.ok) return;
             const ab = await res.arrayBuffer();
             attachments.push({ filename: outName, content: Buffer.from(ab), contentType: 'application/pdf' });
-          } catch {}
+          } catch { }
         };
         await tryAttachFromUrl(AGB_URL, 'AGB.pdf');
         await tryAttachFromUrl(PRIVACY_URL, 'Datenschutzbestimmungen.pdf');
