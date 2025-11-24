@@ -21,6 +21,7 @@ function sanitize(out) {
     "counts",
     "stats",
     "locks",
+    "customDiscount",
   ];
   const trimmed = {};
   for (const k of allow) if (k in payload) trimmed[k] = payload[k];
