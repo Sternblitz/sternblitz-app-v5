@@ -29,5 +29,9 @@ export default function DashboardLayout({ children }) {
   }, [router, pathname]);
 
   if (!ready) return null; // or a spinner
-  return children;
+  return (
+    <>
+      {children}
+    </>
+  );
 }

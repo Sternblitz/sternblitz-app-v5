@@ -107,7 +107,7 @@ export default function DashboardPage() {
 
   // Events vom Simulator (ohne auto-öffnen)
   useEffect(() => {
-    const onStart = (e) => {
+    const onSimStart = (e) => {
       const { name = "", address = "", url = "" } = e.detail || {};
       setGoogleField([name, address].filter(Boolean).join(", "));
       setGoogleUrl(url || "");
@@ -117,28 +117,45 @@ export default function DashboardPage() {
       if (opt) setOption(opt);
     };
     const onStats = (e) => {
-      setCounts(computeCounts(e.detail));
+      const s = e.detail || {};
+      sessionStorage.setItem("sb_stats", JSON.stringify(s));
       setStats({
-        totalReviews: Number(e.detail?.totalReviews ?? null),
-        averageRating:
-          typeof e.detail?.averageRating === "number" ? e.detail.averageRating : null,
-        breakdown: e.detail?.breakdown || null,
+        totalReviews: s.totalReviews,
+        averageRating: s.averageRating,
+        breakdown: s.breakdown
       });
+      setCounts(computeCounts(s));
+    };
+
+    const onFillForm = (e) => {
+      const d = e.detail || {};
+      setCompany(d.company || "");
+      setFirstName(d.firstName || "");
+      setLastName(d.lastName || "");
+      setEmail(d.email || "");
+      setPhone(d.phone || "");
+
+      // Update session payload for checkout
       try {
-        sessionStorage.setItem("sb_stats", JSON.stringify(e.detail));
+        const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
+        const payload = JSON.parse(raw);
+        Object.assign(payload, d);
+        sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
       } catch { }
     };
 
-    window.addEventListener("sb:simulator-start", onStart);
+    window.addEventListener("sb:simulator-start", onSimStart);
     window.addEventListener("sb:option-changed", onOpt);
     window.addEventListener("sb:stats", onStats);
+    window.addEventListener("sb:fill-form", onFillForm);
 
     pullLatest();
 
     return () => {
-      window.removeEventListener("sb:simulator-start", onStart);
+      window.removeEventListener("sb:simulator-start", onSimStart);
       window.removeEventListener("sb:option-changed", onOpt);
       window.removeEventListener("sb:stats", onStats);
+      window.removeEventListener("sb:fill-form", onFillForm);
     };
   }, []);
 
@@ -235,7 +252,7 @@ export default function DashboardPage() {
           <div className="hero-top">
             <h1 className="headline">Hallo 👋</h1>
             <div className="hero-nav">
-              <button className="nav-btn primary" onClick={() => router.push("/dashboard/map")}>
+              <button className="nav-btn primary tour-map" onClick={() => router.push("/dashboard/map")}>
                 Karte 🗺️
               </button>
             </div>
@@ -276,7 +293,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Live-Simulator – unverändert */}
-      <section className="simulator-section">
+      <section className="simulator-section tour-stats">
         <LiveSimulator />
       </section>
 
@@ -286,7 +303,7 @@ export default function DashboardPage() {
           <section className="bottom-cta" aria-label="Weiter zum Formular">
             <div className="cta-card">
               <button
-                className={`primary-btn ${blast ? "blast" : ""}`}
+                className={`primary-btn tour-new-order ${blast ? "blast" : ""}`}
                 onClick={openFormWithBlast}
               >
                 <span className="label">Jetzt loslegen</span>

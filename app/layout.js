@@ -1,6 +1,7 @@
 import "./globals.css";
 import TopNav from "./components/TopNav";
 import HideTopNavOnLogin from "./components/HideTopNavOnLogin";
+import Tour from "./dashboard/Tour";
 
 export const metadata = {
   title: "Sternblitz Sales",
@@ -25,6 +26,7 @@ export default function RootLayout({ children }) {
         <HideTopNavOnLogin>
           <TopNav />
         </HideTopNavOnLogin>
+        <Tour />
         {children}
       </body>
     </html>

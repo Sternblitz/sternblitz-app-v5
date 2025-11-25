@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function MapPage() {
+    const router = useRouter();
     const mapRef = useRef(null);
     const [mapInstance, setMapInstance] = useState(null);
     const [placesService, setPlacesService] = useState(null);
@@ -513,11 +515,11 @@ export default function MapPage() {
                 </div>
 
                 <button className="btn-locate" onClick={() => locateMe()}>📍</button>
-                <button className="btn-search" onClick={searchNearby}>🔍 Bereich suchen</button>
+                <button className="btn-search tour-map-scan" onClick={searchNearby}>🔍 Bereich suchen</button>
             </div>
 
             {/* LIST SECTION */}
-            <div className="list-section">
+            <div className="list-section tour-map-list">
                 <div className="list-header">
                     <div className="lh-top">
                         <h3>Leads ({filteredPlaces.length})</h3>
@@ -648,7 +650,7 @@ export default function MapPage() {
                                         url: selectedPlace.url || ""
                                     };
                                     sessionStorage.setItem("sb_selected_profile", JSON.stringify(profile));
-                                    window.location.href = "/dashboard";
+                                    router.push("/dashboard");
                                 }}
                             >
                                 🚀 Simulator starten

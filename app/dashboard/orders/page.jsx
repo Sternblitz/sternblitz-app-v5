@@ -924,7 +924,7 @@ export default function OrdersPage() {
 
   return (
     <main className="orders-shell">
-      <section className="chart-panel">
+      <section className="chart-panel tour-orders-stats">
         <SalesRing rows={rows} />
       </section>
       <header className="orders-head">
@@ -1058,7 +1058,7 @@ export default function OrdersPage() {
         </div>
       </section>
 
-      <section className="list">
+      <section className="list tour-orders-list">
         {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN") ? (
           <Leaderboard
             mode={boardMode}

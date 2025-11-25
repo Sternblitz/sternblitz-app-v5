@@ -901,7 +901,7 @@ export default function SignPage() {
         </section>
 
         {/* Signatur */}
-        <section className="card signature">
+        <section className="card signature tour-sign-pad">
           <div className="sig-head">
             <div className="sig-title">Unterschrift</div>
             <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
@@ -937,7 +937,7 @@ export default function SignPage() {
         <section className="actions center roomy">
           <button
             type="button"
-            className="submit-btn next"
+            className="submit-btn next tour-sign-submit"
             onClick={submit}
             disabled={saving}
           >
