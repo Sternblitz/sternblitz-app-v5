@@ -431,9 +431,11 @@ export default function Tour() {
             <div {...tooltipProps} style={{
                 background: "rgba(255, 255, 255, 0.95)",
                 backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)", // Safari support
                 borderRadius: 24,
                 padding: 28,
                 maxWidth: 440,
+                width: "90vw", // Responsive width for mobile
                 boxShadow: "0 25px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.5) inset",
                 fontFamily: "'Inter', sans-serif",
                 border: "1px solid rgba(255,255,255,0.8)"
@@ -507,6 +509,7 @@ export default function Tour() {
                 overlay: {
                     backgroundColor: 'rgba(15, 23, 42, 0.6)',
                     backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)', // Safari support
                 },
                 spotlight: {
                     borderRadius: 20,
