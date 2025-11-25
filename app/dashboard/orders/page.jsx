@@ -843,6 +843,15 @@ export default function OrdersPage() {
           .pill.info { border-color:#0b6cf233; background:#eef5ff; color:#0b6cf2 }
           .summary-actions { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
           .team-line { margin: 2px 0 0; font-size: 12px; color:#0b6cf2; font-weight: 800; }
+          .action-btn.special {
+          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+          color: #fff; border: none;
+        }
+        .action-btn.invite-btn {
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+          color: #fff; border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+        .action-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
           .mini-btn { height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #e5e7eb; background:#fff; font-weight: 700; font-size: 13px; cursor: pointer; }
           .mini-btn:hover { transform: translateY(-1px); box-shadow:0 2px 10px rgba(0,0,0,.06); }
           .mini-btn.blue { border-color:#0b6cf2; color:#0b6cf2; background:#f0f6ff; }
@@ -925,21 +934,26 @@ export default function OrdersPage() {
         </div>
         <div className="actions">
           {me?.role === "ADMIN" && (
-            <button
-              type="button"
-              className="action-btn special"
-              onClick={() => {
-                const amount = prompt("Rabatt in € eingeben (z.B. 50):");
-                if (!amount) return;
-                const val = parseFloat(amount.replace(",", "."));
-                if (val > 0) {
-                  sessionStorage.setItem("sb_custom_discount", Math.round(val * 100));
-                  router.push("/dashboard");
-                }
-              }}
-            >
-              Rabatt 🏷️
-            </button>
+            <>
+              <Link className="action-btn invite-btn" href="/dashboard/team">
+                Invite 👥
+              </Link>
+              <button
+                type="button"
+                className="action-btn special"
+                onClick={() => {
+                  const amount = prompt("Rabatt in € eingeben (z.B. 50):");
+                  if (!amount) return;
+                  const val = parseFloat(amount.replace(",", "."));
+                  if (val > 0) {
+                    sessionStorage.setItem("sb_custom_discount", Math.round(val * 100));
+                    router.push("/dashboard");
+                  }
+                }}
+              >
+                Rabatt 🏷️
+              </button>
+            </>
           )}
           <Link className="action-btn" href="/dashboard">
             Neuer Auftrag
