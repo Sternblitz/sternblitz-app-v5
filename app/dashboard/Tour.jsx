@@ -507,9 +507,9 @@ export default function Tour() {
                     primaryColor: "#0b6cf2",
                 },
                 overlay: {
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                    backdropFilter: 'blur(8px)',
-                    WebkitBackdropFilter: 'blur(8px)', // Safari support
+                    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                    backdropFilter: 'blur(16px) saturate(150%)',
+                    WebkitBackdropFilter: 'blur(16px) saturate(150%)', // Safari support
                 },
                 spotlight: {
                     borderRadius: 20,
