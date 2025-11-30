@@ -180,6 +180,9 @@ export async function POST(req) {
       lastName,
       email,
       phone,
+      street,
+      zip,
+      city,
       signaturePng,
       counts,                 // { c123, c12, c1 }
       stats,
@@ -322,7 +325,7 @@ export async function POST(req) {
     }
 
     // 1) PDF bauen
-    const sigBytes = dataUrlToUint8(signaturePng);
+    const sigBytes = signaturePng ? Buffer.from(signaturePng.split(",")[1], "base64") : null;
     const finalPriceCents = computeFinal(BASE_PRICE_CENTS, appliedDiscount);
     const usedPromoCode = referralMatch?.code || (normalizedReferralCode || null);
     const pdfBytes = await buildPdf(
@@ -332,6 +335,9 @@ export async function POST(req) {
         company,
         firstName,
         lastName,
+        street,
+        zip,
+        city,
         email,
         phone,
         counts,

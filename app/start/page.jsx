@@ -17,7 +17,7 @@ export default function StartPage() {
       const p = JSON.parse(raw);
       const selRaw = sessionStorage.getItem("sb_selected_profile") || "";
       let googleUrl = p.googleUrl || "";
-      try { if (selRaw) { const sel = JSON.parse(selRaw); if (sel?.url) googleUrl = sel.url; } } catch {}
+      try { if (selRaw) { const sel = JSON.parse(selRaw); if (sel?.url) googleUrl = sel.url; } } catch { }
       const optRaw = sessionStorage.getItem("sb_selected_option") || "";
       const next = {
         ...p,
@@ -27,16 +27,22 @@ export default function StartPage() {
         company: patch.company ?? (p.company || ""),
         firstName: patch.firstName ?? (p.firstName || ""),
         lastName: patch.lastName ?? (p.lastName || ""),
+        street: patch.street ?? (p.street || ""),
+        zip: patch.zip ?? (p.zip || ""),
+        city: patch.city ?? (p.city || ""),
         email: patch.email ?? (p.email || ""),
         phone: patch.phone ?? (p.phone || ""),
       };
       sessionStorage.setItem("sb_checkout_payload", JSON.stringify(next));
-    } catch {}
+    } catch { }
   };
   const [contact, setContact] = useState({
     company: "",
     firstName: "",
     lastName: "",
+    street: "",
+    zip: "",
+    city: "",
     email: "",
     phone: "",
   });
@@ -45,10 +51,11 @@ export default function StartPage() {
   const [errors, setErrors] = useState({});
   const canProceed = (() => {
     const okNames = (contact.firstName || "").trim().length >= 2 && (contact.lastName || "").trim().length >= 2;
+    const okAddr = (contact.street || "").trim().length >= 3 && (contact.zip || "").trim().length >= 3 && (contact.city || "").trim().length >= 2;
     const okEmail = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((contact.email || "").trim());
     const okProfile = Boolean((googleProfile || "").trim());
     const okOpt = Boolean((selectedOption || "").trim());
-    return okNames && okEmail && okProfile && okOpt;
+    return okNames && okAddr && okEmail && okProfile && okOpt;
   })();
 
   useEffect(() => {
@@ -70,14 +77,14 @@ export default function StartPage() {
           if (storedCode) code = storedCode;
           const storedDiscount = sessionStorage.getItem("sb_ref_discount");
           if (storedDiscount) discount = Number(storedDiscount) || 0;
-        } catch {}
+        } catch { }
         if (typeof document !== "undefined" && !code) {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (match) code = decodeURIComponent(match[1]);
         }
         if (!isFresh) {
-          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch {}
-          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch {}
+          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch { }
+          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch { }
           setPromo({ code: null, discount: 0 });
           return;
         }
@@ -85,7 +92,7 @@ export default function StartPage() {
           if (!discount) discount = 2500;
           setPromo({ code: code.toUpperCase(), discount });
         }
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -100,11 +107,11 @@ export default function StartPage() {
         const gp = [name, address].filter(Boolean).join(", ");
         if (gp) setGoogleProfile(gp);
       }
-    } catch {}
+    } catch { }
     try {
       const opt = sessionStorage.getItem("sb_selected_option") || "";
-      if (opt && ["123","12","1"].includes(opt)) setSelectedOption(opt);
-    } catch {}
+      if (opt && ["123", "12", "1"].includes(opt)) setSelectedOption(opt);
+    } catch { }
   }, []);
 
   // Counts from stats (session or events)
@@ -123,13 +130,13 @@ export default function StartPage() {
         const s = JSON.parse(raw);
         setCounts(compute(s));
       }
-    } catch {}
+    } catch { }
     const onStats = (e) => {
       const s = e?.detail || null;
       if (s) setCounts(compute(s));
     };
-    try { window.addEventListener('sb:stats', onStats); } catch {}
-    return () => { try { window.removeEventListener('sb:stats', onStats); } catch {} };
+    try { window.addEventListener('sb:stats', onStats); } catch { }
+    return () => { try { window.removeEventListener('sb:stats', onStats); } catch { } };
   }, []);
 
   // Init Google Places Autocomplete on the Google‑Profil input (when contact edit is open)
@@ -153,10 +160,10 @@ export default function StartPage() {
             "sb_selected_profile",
             JSON.stringify({ name, address, url })
           );
-        } catch {}
+        } catch { }
         updateCheckoutPartial({ googleProfile: fresh });
       });
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -178,16 +185,16 @@ export default function StartPage() {
     };
     const onOption = (e) => {
       const opt = e?.detail;
-      if (opt && ["123","12","1"].includes(opt)) {
+      if (opt && ["123", "12", "1"].includes(opt)) {
         setSelectedOption(opt);
         updateCheckoutPartial({ selectedOption: opt });
       }
     };
-    try { window.addEventListener("sb:profile", onProfile); } catch {}
-    try { window.addEventListener("sb:option-changed", onOption); } catch {}
+    try { window.addEventListener("sb:profile", onProfile); } catch { }
+    try { window.addEventListener("sb:option-changed", onOption); } catch { }
     return () => {
-      try { window.removeEventListener("sb:profile", onProfile); } catch {}
-      try { window.removeEventListener("sb:option-changed", onOption); } catch {}
+      try { window.removeEventListener("sb:profile", onProfile); } catch { }
+      try { window.removeEventListener("sb:option-changed", onOption); } catch { }
     };
   }, []);
 
@@ -202,6 +209,9 @@ export default function StartPage() {
     (contact.company || "").trim().length >= 2 &&
     (contact.firstName || "").trim().length >= 2 &&
     (contact.lastName || "").trim().length >= 2 &&
+    (contact.street || "").trim().length >= 3 &&
+    (contact.zip || "").trim().length >= 3 &&
+    (contact.city || "").trim().length >= 2 &&
     isValidEmail(contact.email) &&
     isValidPhone(contact.phone);
 
@@ -215,10 +225,10 @@ export default function StartPage() {
           const address = (parts.join(",") || "").trim();
           const sel = { name, address, url: "" };
           sessionStorage.setItem("sb_selected_profile", JSON.stringify(sel));
-        } catch {}
+        } catch { }
       }
       if (selectedOption) {
-        try { sessionStorage.setItem("sb_selected_option", selectedOption); } catch {}
+        try { sessionStorage.setItem("sb_selected_option", selectedOption); } catch { }
       }
       const sel = JSON.parse(sessionStorage.getItem("sb_selected_profile") || "{}");
       const stats = JSON.parse(sessionStorage.getItem("sb_stats") || "{}");
@@ -241,6 +251,9 @@ export default function StartPage() {
         if (!(contact.company || '').trim() || (contact.company || '').trim().length < 2) missing.push('Firma');
         if (!(contact.firstName || '').trim() || (contact.firstName || '').trim().length < 2) missing.push('Vorname');
         if (!(contact.lastName || '').trim() || (contact.lastName || '').trim().length < 2) missing.push('Nachname');
+        if (!(contact.street || '').trim() || (contact.street || '').trim().length < 3) missing.push('Straße');
+        if (!(contact.zip || '').trim() || (contact.zip || '').trim().length < 3) missing.push('PLZ');
+        if (!(contact.city || '').trim() || (contact.city || '').trim().length < 2) missing.push('Stadt');
         if (!isValidEmail(contact.email)) missing.push('E‑Mail');
         if (!isValidPhone(contact.phone)) missing.push('Telefon');
         const msg = missing.length
@@ -259,10 +272,13 @@ export default function StartPage() {
           else if (!(contact.company || '').trim() || (contact.company || '').trim().length < 2) focusEl = document.querySelector('#start-contact input[placeholder="Firma GmbH"]');
           else if (!(contact.firstName || '').trim() || (contact.firstName || '').trim().length < 2) focusEl = document.querySelector('#start-contact input[name=firstName]');
           else if (!(contact.lastName || '').trim() || (contact.lastName || '').trim().length < 2) focusEl = document.querySelector('#start-contact input[placeholder="Mustermann"]');
+          else if (!(contact.street || '').trim() || (contact.street || '').trim().length < 3) focusEl = document.querySelector('#start-contact input[name=street]');
+          else if (!(contact.zip || '').trim() || (contact.zip || '').trim().length < 3) focusEl = document.querySelector('#start-contact input[name=zip]');
+          else if (!(contact.city || '').trim() || (contact.city || '').trim().length < 2) focusEl = document.querySelector('#start-contact input[name=city]');
           else if (!isValidEmail(contact.email)) focusEl = document.querySelector('#start-contact input[type=email]');
           else if (!isValidPhone(contact.phone)) focusEl = document.querySelector('#start-contact input[type=tel]');
           if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
-        } catch {}
+        } catch { }
         return;
       }
 
@@ -279,12 +295,15 @@ export default function StartPage() {
         company: contact.company || "",
         firstName: contact.firstName || "",
         lastName: contact.lastName || "",
+        street: contact.street || "",
+        zip: contact.zip || "",
+        city: contact.city || "",
         email: contact.email || "",
         phone: contact.phone || "",
       };
       sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-    } catch {}
-    try { window.location.assign("/sign"); } catch {}
+    } catch { }
+    try { window.location.assign("/sign"); } catch { }
   };
 
   return (
@@ -338,7 +357,7 @@ export default function StartPage() {
                 <b>Bewertungen:</b>{" "}
                 {selectedOption === "123" ? "1–3 ⭐"
                   : selectedOption === "12" ? "1–2 ⭐"
-                  : selectedOption === "1" ? "1 ⭐" : "—"}
+                    : selectedOption === "1" ? "1 ⭐" : "—"}
                 {(() => {
                   const n = selectedOption === '123' ? counts.c123 : selectedOption === '12' ? counts.c12 : selectedOption === '1' ? counts.c1 : null;
                   return Number.isFinite(n) ? (
@@ -349,6 +368,10 @@ export default function StartPage() {
               <div><b>Firma:</b> {contact.company || "—"}</div>
               <div><b>Vorname:</b> {contact.firstName || "—"}</div>
               <div><b>Nachname:</b> {contact.lastName || "—"}</div>
+              <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Rechnungsadresse</div>
+              <div><b>Straße:</b> {contact.street || "—"}</div>
+              <div><b>PLZ/Stadt:</b> {(contact.zip || "—") + " " + (contact.city || "")}</div>
+              <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Kommunikation</div>
               <div><b>E‑Mail:</b> {contact.email || "—"}</div>
               <div><b>Telefon:</b> {contact.phone || "—"}</div>
             </div>
@@ -360,38 +383,38 @@ export default function StartPage() {
                 <div className="field">
                   <label>Profil</label>
                   <div className="input-row">
-                  <input
-                    name="googleProfile"
-                    type="text"
-                    placeholder='z. B. "Restaurant XY, Berlin"'
-                    ref={gpInputRef}
-                    value={googleProfile}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setGoogleProfile(v);
-                      try {
-                        const parts = v.split(',');
-                        const name = (parts.shift() || '').trim();
-                        const address = (parts.join(',') || '').trim();
-                        const sel = { name, address, url: '' };
-                        sessionStorage.setItem('sb_selected_profile', JSON.stringify(sel));
-                      } catch {}
-                      updateCheckoutPartial({ googleProfile: v });
-                    }}
-                  />
-                  {googleProfile ? (
-                    <button
-                      type="button"
-                      className="clear-btn"
-                      aria-label="Profil löschen"
-                      onClick={() => {
-                        setGoogleProfile("");
-                        try { sessionStorage.removeItem('sb_selected_profile'); } catch {}
-                        updateCheckoutPartial({ googleProfile: "" });
-                        gpInputRef.current?.focus();
+                    <input
+                      name="googleProfile"
+                      type="text"
+                      placeholder='z. B. "Restaurant XY, Berlin"'
+                      ref={gpInputRef}
+                      value={googleProfile}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setGoogleProfile(v);
+                        try {
+                          const parts = v.split(',');
+                          const name = (parts.shift() || '').trim();
+                          const address = (parts.join(',') || '').trim();
+                          const sel = { name, address, url: '' };
+                          sessionStorage.setItem('sb_selected_profile', JSON.stringify(sel));
+                        } catch { }
+                        updateCheckoutPartial({ googleProfile: v });
                       }}
-                    >×</button>
-                  ) : null}
+                    />
+                    {googleProfile ? (
+                      <button
+                        type="button"
+                        className="clear-btn"
+                        aria-label="Profil löschen"
+                        onClick={() => {
+                          setGoogleProfile("");
+                          try { sessionStorage.removeItem('sb_selected_profile'); } catch { }
+                          updateCheckoutPartial({ googleProfile: "" });
+                          gpInputRef.current?.focus();
+                        }}
+                      >×</button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -401,8 +424,8 @@ export default function StartPage() {
                 <div className="seg-options">
                   {[
                     { v: '123', label: '1–3 ⭐ löschen' },
-                    { v: '12',  label: '1–2 ⭐ löschen' },
-                    { v: '1',   label: '1 ⭐ löschen'  },
+                    { v: '12', label: '1–2 ⭐ löschen' },
+                    { v: '1', label: '1 ⭐ löschen' },
                   ].map((o) => (
                     <button
                       key={o.v}
@@ -410,9 +433,9 @@ export default function StartPage() {
                       className={`seg-opt ${selectedOption === o.v ? 'on' : ''}`}
                       onClick={() => {
                         setSelectedOption(o.v);
-                        try { sessionStorage.setItem('sb_selected_option', o.v); } catch {}
+                        try { sessionStorage.setItem('sb_selected_option', o.v); } catch { }
                         updateCheckoutPartial({ selectedOption: o.v });
-                        try { window.dispatchEvent(new CustomEvent('sb:option-changed', { detail: o.v })); } catch {}
+                        try { window.dispatchEvent(new CustomEvent('sb:option-changed', { detail: o.v })); } catch { }
                       }}
                     >
                       {o.label}
@@ -439,10 +462,27 @@ export default function StartPage() {
                     {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
                   </div>
                 </div>
+                <div className="field">
+                  <label>Straße & Hausnummer <span className="req">*</span></label>
+                  <input name="street" type="text" placeholder="Musterstraße 123" value={contact.street} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, street: v })); updateCheckoutPartial({ street: v }); setErrors((er) => ({ ...er, street: v.trim().length >= 3 ? null : 'Bitte Straße angeben' })); }} />
+                  {errors.street ? <div className="err-msg">{errors.street}</div> : null}
+                </div>
+                <div className="row">
+                  <div className="field half">
+                    <label>PLZ <span className="req">*</span></label>
+                    <input name="zip" type="text" placeholder="12345" value={contact.zip} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, zip: v })); updateCheckoutPartial({ zip: v }); setErrors((er) => ({ ...er, zip: v.trim().length >= 3 ? null : 'Bitte PLZ angeben' })); }} />
+                    {errors.zip ? <div className="err-msg">{errors.zip}</div> : null}
+                  </div>
+                  <div className="field half">
+                    <label>Stadt <span className="req">*</span></label>
+                    <input name="city" type="text" placeholder="Berlin" value={contact.city} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, city: v })); updateCheckoutPartial({ city: v }); setErrors((er) => ({ ...er, city: v.trim().length >= 2 ? null : 'Bitte Stadt angeben' })); }} />
+                    {errors.city ? <div className="err-msg">{errors.city}</div> : null}
+                  </div>
+                </div>
                 <div className="row">
                   <div className="field half">
                     <label>E‑Mail <span className="req">*</span></label>
-                    <input type="email" placeholder="max@firma.de" value={contact.email} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, email: v })); updateCheckoutPartial({ email: v }); setErrors((er) => ({ ...er, email: /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v||'').trim()) ? null : 'Bitte gültige E‑Mail angeben' })); }} />
+                    <input type="email" placeholder="max@firma.de" value={contact.email} onChange={(e) => { const v = e.target.value; setContact((c) => ({ ...c, email: v })); updateCheckoutPartial({ email: v }); setErrors((er) => ({ ...er, email: /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v || '').trim()) ? null : 'Bitte gültige E‑Mail angeben' })); }} />
                     {errors.email ? <div className="err-msg">{errors.email}</div> : null}
                   </div>
                   <div className="field half">

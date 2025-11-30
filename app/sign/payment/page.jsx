@@ -129,13 +129,21 @@ export default function PaymentPage() {
           email = p?.email || null;
           name = [p?.firstName, p?.lastName].filter(Boolean).join(" ") || null;
           company = p?.company || null;
+          const street = p?.street || "";
+          const zip = p?.zip || "";
+          const city = p?.city || "";
+
           setBilling((b) => ({
             ...b,
             billing_email: email || b.billing_email,
             billing_name: name || b.billing_name,
             billing_company: company || b.billing_company,
+            billing_line1: street || b.billing_line1,
+            billing_postal_code: zip || b.billing_postal_code,
+            billing_city: city || b.billing_city,
           }));
           if (email) setShowEmail(true);
+          if (street || zip || city) setShowAddress(true);
         } catch { }
         try { order_id = sessionStorage.getItem("sb_order_id") || null; } catch { }
         try {
@@ -334,281 +342,457 @@ export default function PaymentPage() {
 
   return (
     <main className="pay-page">
-      <section className="hero">
-        <div className="pill">Schritt 3 von 3 – Sicher abschließen</div>
-        <h1>Jetzt sicher beauftragen – <span>Zahlung erst nach Löschung</span></h1>
-        <p>Du hinterlegst dein Zahlungsmittel nur zur Autorisierung. Wir belasten erst nach bestätigtem Erfolg.</p>
-        <ul className="hero-bullets">
-          <li className="item">
-            <div className="icon">💸</div>
-            <div className="text">
-              <div className="title">0 € Vorkasse</div>
-              <div className="sub">Zahlung nach Erfolg</div>
-            </div>
-          </li>
-          <li className="item">
-            <div className="icon">🔒</div>
-            <div className="text">
-              <div className="title">Stripe‑Sicherheit</div>
-              <div className="sub">3D‑Secure & Verschlüsselung</div>
-            </div>
-          </li>
-          <li className="item">
-            <div className="icon">✅</div>
-            <div className="text">
-              <div className="title">Fair & transparent</div>
-              <div className="sub">Abbuchung erst nach Nachweis</div>
-            </div>
-          </li>
-        </ul>
-      </section>
+      <div className="pay-bg-glow"></div>
+      <div className="pay-container">
 
-      {/* Info-Grid bewusst entfernt für mehr Ruhe – Hauptbotschaft oben, Details unten im Trust-Block */}
+        {/* LEFT COLUMN: Trust & Timeline */}
+        <section className="left-col">
+          <div className="trust-hero">
+            <div className="badge-pill">🛡️ 0,00 € Risiko</div>
+            <h1>Zahlungsmittel sicher hinterlegen</h1>
+            <p className="hero-sub">
+              Keine Abbuchung heute. Du zahlst erst, wenn wir deine negativen Bewertungen erfolgreich gelöscht haben.
+            </p>
 
-      <section className="content-grid">
-        <div className="summary-card compact">
-          <header>
-            <div>
-              <p className="eyebrow">Rechnungsdaten</p>
-              <h2>Rechnungsdaten (für deinen Löschbericht)</h2>
-            </div>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => {
-                setEditBilling((v) => {
-                  const next = !v;
-                  if (next) setBillingDraft(billing);
-                  return next;
-                });
-              }}
-            >✏️</button>
-          </header>
-          {!editBilling ? (
-            <ul className="details">
-              <li><span>Name</span><strong>{billing.billing_name || "—"}</strong></li>
-              <li><span>Firma</span><strong>{billing.billing_company || "—"}</strong></li>
-              <li><span>E‑Mail</span><strong>{billing.billing_email || "—"}</strong></li>
-              <li><span>Adresse</span><strong>{billing.billing_line1 || billing.billing_city || billing.billing_postal_code ? `${billing.billing_line1 || ""} ${billing.billing_postal_code || ""} ${billing.billing_city || ""} ${billing.billing_country || ""}`.trim() : "—"}</strong></li>
-            </ul>
-          ) : (
-            <>
-              <div className="billing-grid">
-                <label>
-                  <span>Vollständiger Name</span>
-                  <input value={billingDraft?.billing_name || ""} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_name: e.target.value }))} placeholder="Max Mustermann" />
-                </label>
-                <label>
-                  <span>Firma (optional)</span>
-                  <input value={billingDraft?.billing_company || ""} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_company: e.target.value }))} placeholder="Firma GmbH" />
-                </label>
-                {showEmail ? (
-                  <label className="span2">
-                    <span>E‑Mail (optional)</span>
-                    <input type="email" value={billingDraft?.billing_email || ""} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_email: e.target.value }))} placeholder="max@firma.de" />
-                  </label>
-                ) : null}
-              </div>
-              {!showEmail ? (
-                <button type="button" className="stroke-btn" onClick={() => setShowEmail(true)}>+ E‑Mail hinzufügen (optional)</button>
-              ) : null}
-              {!showAddress ? (
-                <button type="button" className="stroke-btn" onClick={() => setShowAddress(true)}>+ Adresse hinzufügen (optional)</button>
-              ) : (
-                <div className="billing-grid">
-                  <label className="span2">
-                    <span>Straße & Nr.</span>
-                    <input value={billingDraft?.billing_line1 || ""} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_line1: e.target.value }))} placeholder="Musterstraße 1" />
-                  </label>
-                  <label>
-                    <span>PLZ</span>
-                    <input value={billingDraft?.billing_postal_code || ""} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_postal_code: e.target.value }))} placeholder="12345" />
-                  </label>
-                  <label>
-                    <span>Ort</span>
-                    <input value={billingDraft?.billing_city || ""} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_city: e.target.value }))} placeholder="Berlin" />
-                  </label>
-                  <label>
-                    <span>Land</span>
-                    <select value={billingDraft?.billing_country || "DE"} onChange={(e) => setBillingDraft((v) => ({ ...v, billing_country: e.target.value }))}>
-                      <option value="DE">Deutschland</option>
-                      <option value="AT">Österreich</option>
-                      <option value="CH">Schweiz</option>
-                    </select>
-                  </label>
+            {/* Visual Timeline */}
+            <div className="timeline-box">
+              <div className="timeline-step active delay-1">
+                <div className="step-icon">1</div>
+                <div className="step-content">
+                  <strong>Heute: 0,00 €</strong>
+                  <p>Zahlungsmittel autorisieren</p>
                 </div>
-              )}
-              <div className="row-actions">
-                <button type="button" className="link-cancel" onClick={() => { setEditBilling(false); setBillingDraft(null); }}>Abbrechen</button>
-                <button
-                  type="button"
-                  className="btn solid"
-                  onClick={async () => {
-                    if (billingDraft) setBilling(billingDraft);
-                    try {
-                      if (orderId && billingDraft) {
-                        const name = (billingDraft.billing_name || "").trim();
-                        const parts = name.split(/\s+/);
-                        const first_name = parts.length > 1 ? parts.slice(0, -1).join(" ") : name || null;
-                        const last_name = parts.length > 1 ? parts.slice(-1).join(" ") : null;
-                        await fetch(`/api/orders/${orderId}/billing`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            ...billingDraft,
-                            email: billingDraft.billing_email || null,
-                            first_name,
-                            last_name,
-                            company: billingDraft.billing_company || null,
-                          }),
-                        });
-                      }
-                    } catch { }
-                    setEditBilling(false);
-                  }}
-                >Speichern</button>
               </div>
-            </>
-          )}
+              <div className="step-line delay-2"></div>
+              <div className="timeline-step delay-3">
+                <div className="step-icon">2</div>
+                <div className="step-content">
+                  <strong>Bearbeitung</strong>
+                  <p>Wir löschen die Bewertung</p>
+                </div>
+              </div>
+              <div className="step-line delay-4"></div>
+              <div className="timeline-step success delay-5">
+                <div className="step-icon">3</div>
+                <div className="step-content">
+                  <strong>Erfolg</strong>
+                  <p>Zahlung erst nach Nachweis</p>
+                </div>
+              </div>
+            </div>
 
-          {promoCode ? <div className="promo-chip">🎉 Promo aktiv: {promoCode}</div> : null}
-          <div className="price-box">
-            <div>Grundpreis <strong>{(basePrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong></div>
-            {appliedDiscount ? (
-              <div className="discount">{promoCode ? `Promo ${promoCode}` : "Spezial-Rabatt"}: −{(appliedDiscount / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</div>
-            ) : null}
-            <div className="sum">
-              Zu zahlen nach Erfolg:
-              {appliedDiscount ? (
-                <>
-                  <span className="old">{(basePrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
-                  <span className="arrow">→</span>
-                </>
-              ) : null}
-              <span className="new">{(finalPrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+            <ul className="trust-list">
+              <li>
+                <span className="icon">✅</span>
+                <div>
+                  <strong>Erst Erfolg, dann Zahlung</strong>
+                  <p>Wir buchen erst ab, wenn die Löschung bestätigt ist.</p>
+                </div>
+              </li>
+              <li>
+                <span className="icon">🔒</span>
+                <div>
+                  <strong>Sichere Datenübertragung</strong>
+                  <p>Deine Daten sind per 256-bit SSL verschlüsselt.</p>
+                </div>
+              </li>
+              <li>
+                <span className="icon">📄</span>
+                <div>
+                  <strong>Rechnung & Beleg</strong>
+                  <p>Du erhältst automatisch eine Rechnung per E-Mail.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div className="summary-box">
+            <h3>Zusammenfassung</h3>
+            <div className="sum-row">
+              <span>Grundpreis</span>
+              <strong>{(basePrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong>
+            </div>
+            {appliedDiscount > 0 && (
+              <div className="sum-row discount">
+                <span>Rabatt {promoCode ? `(${promoCode})` : ""}</span>
+                <strong>−{(appliedDiscount / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</strong>
+              </div>
+            )}
+            <div className="divider"></div>
+            <div className="sum-row total">
+              <span>Fällig nach Erfolg:</span>
+              <span className="amount">{(finalPrice / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+            </div>
+            <div className="sum-row today-highlight pulse-animation">
+              <span>Fällig heute:</span>
+              <span className="amount-zero">0,00 €</span>
             </div>
           </div>
-          <p className="note">Dein Zahlungsmittel bleibt nur hinterlegt – wir belasten erst nach bestätigtem Erfolg.</p>
-          <p className="note small">Du erhältst automatisch eine Rechnung + Abschlussbericht.</p>
-        </div>
+        </section>
 
-        <div className="form-card">
-          <header>
-            <p className="eyebrow">Zahlungsmittel</p>
-            <h2>Daten sicher hinterlegen</h2>
-            <p className="sub action">Damit wir starten können, hinterlege jetzt dein Zahlungsmittel. Keine Abbuchung vor Erfolg.</p>
-          </header>
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: { theme: "stripe" },
-              defaultValues: {
-                billingDetails: {
-                  name: billing.billing_name || undefined,
-                  email: billing.billing_email || undefined,
-                  address: {
-                    line1: billing.billing_line1 || undefined,
-                    city: billing.billing_city || undefined,
-                    postal_code: billing.billing_postal_code || undefined,
-                    country: billing.billing_country || undefined,
+        {/* RIGHT COLUMN: Payment Form */}
+        <section className="right-col">
+          <div className="form-card glass-panel">
+            <header>
+              <h2>Zahlungsmethode</h2>
+              <p>Wähle deine bevorzugte Zahlungsart. Dein Konto wird heute <u>nicht</u> belastet.</p>
+            </header>
+
+            <Elements
+              stripe={stripePromise}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: "stripe",
+                  variables: {
+                    colorPrimary: '#4f46e5', // Indigo-600
+                    borderRadius: '12px',
+                    fontFamily: '"Outfit", sans-serif',
+                    spacingUnit: '5px',
+                  }
+                },
+                defaultValues: {
+                  billingDetails: {
+                    name: billing.billing_name || undefined,
+                    email: billing.billing_email || undefined,
+                    address: {
+                      line1: billing.billing_line1 || undefined,
+                      city: billing.billing_city || undefined,
+                      postal_code: billing.billing_postal_code || undefined,
+                      country: billing.billing_country || undefined,
+                    },
                   },
                 },
-              },
-            }}
-          >
-            <PaymentForm orderId={orderId} billing={billing} />
-          </Elements>
-          <div className="stripe-note"><span>🔐</span><p>Stripe (PCI‑konform) verwaltet dein Zahlungsmittel sicher. Belastung erst nach Erfolgsnachweis.</p></div>
-        </div>
-      </section>
+              }}
+            >
+              <PaymentForm orderId={orderId} billing={billing} />
+            </Elements>
 
-      <section className="trust-block">
-        <div className="trust-item"><span className="ico">✅</span><div><h4>Zahlung nach Erfolg</h4><p>Keine Vorkasse, kein Risiko.</p></div></div>
-        <div className="trust-item"><span className="ico">🔒</span><div><h4>Sichere Stripe‑Verbindung</h4><p>3D‑Secure & Verschlüsselung.</p></div></div>
-        <div className="trust-item"><span className="ico">📩</span><div><h4>Rechnung & Bericht</h4><p>Automatisch per E‑Mail.</p></div></div>
-        <div className="trust-item"><span className="ico">💬</span><div><h4>Schneller Support</h4><p>Persönlich erreichbar.</p></div></div>
-      </section>
+            <div className="secure-footer">
+              <span className="lock">🔒</span>
+              <p>Sichere SSL-Verbindung. Zertifiziert durch Stripe.</p>
+            </div>
+          </div>
 
-      <section className="trust-logos">
-        <div className="badge">🔒 SSL‑verschlüsselt</div>
-        <div className="badge">💳 Stripe‑Zahlung</div>
-        <div className="badge">🇩🇪 Made in Germany</div>
-      </section>
+          <div className="billing-summary">
+            <div className="head">
+              <span>Rechnungsdaten</span>
+              <button onClick={() => setEditBilling(!editBilling)}>Bearbeiten</button>
+            </div>
+            {!editBilling ? (
+              <p>
+                {billing.billing_company && <>{billing.billing_company}<br /></>}
+                {billing.billing_name}<br />
+                {billing.billing_line1}<br />
+                {billing.billing_postal_code} {billing.billing_city}
+              </p>
+            ) : (
+              <div className="edit-hint">
+                Bitte kontaktiere den Support für Änderungen oder nutze den "Bearbeiten" Button oben (vereinfacht).
+              </div>
+            )}
+            {editBilling && (
+              <div className="mini-edit">
+                <input placeholder="Name" value={billing.billing_name} onChange={e => setBilling({ ...billing, billing_name: e.target.value })} />
+                <input placeholder="Straße" value={billing.billing_line1} onChange={e => setBilling({ ...billing, billing_line1: e.target.value })} />
+                <div className="row">
+                  <input placeholder="PLZ" value={billing.billing_postal_code} onChange={e => setBilling({ ...billing, billing_postal_code: e.target.value })} />
+                  <input placeholder="Ort" value={billing.billing_city} onChange={e => setBilling({ ...billing, billing_city: e.target.value })} />
+                </div>
+                <button className="save-btn" onClick={() => setEditBilling(false)}>Speichern</button>
+              </div>
+            )}
+          </div>
+        </section>
+
+      </div>
 
       <style jsx>{`
-        .pay-page{min-height:100vh;padding:32px 16px 80px;background:radial-gradient(circle at top,#eef2ff,#ffffff 45%)}
-        .hero{max-width:820px;margin:0 auto 26px}
-        .pill{display:inline-flex;padding:6px 14px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
-        .hero h1{font-size:36px;margin:0;color:#0f172a;font-weight:900;line-height:1.15}
-        .hero h1 span{color:#2563eb}
-        .hero p{max-width:640px;color:#475569;margin:10px 0 16px;font-size:16px}
-        .hero-bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-        .hero-bullets .item{display:flex;gap:12px;align-items:center;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 10px 26px rgba(15,23,42,.06)}
-        .hero-bullets .icon{font-size:20px;line-height:1}
-        .hero-bullets .text .title{font-weight:900;color:#0f172a}
-        .hero-bullets .text .sub{font-size:13.5px;color:#64748b}
+        @keyframes pulse-glow {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); transform: scale(1); }
+          70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); transform: scale(1.02); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); transform: scale(1); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes growLine {
+          from { width: 0; opacity: 0; }
+          to { width: 100%; opacity: 1; }
+        }
 
-        /* Info-Grid entfernt */
+        .pay-page {
+          min-height: 100vh;
+          background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+          padding: 60px 20px;
+          font-family: 'Outfit', sans-serif;
+          position: relative;
+          overflow: hidden;
+        }
+        .pay-bg-glow {
+          position: absolute;
+          top: -30%;
+          right: -10%;
+          width: 900px;
+          height: 900px;
+          background: radial-gradient(circle, rgba(79, 70, 229, 0.08) 0%, rgba(255,255,255,0) 70%);
+          z-index: 0;
+          pointer-events: none;
+        }
+        .pay-container {
+          max-width: 1140px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 1fr 480px;
+          gap: 80px;
+          align-items: start;
+          position: relative;
+          z-index: 1;
+        }
 
-        .content-grid{max-width:1000px;margin:0 auto 32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px}
-        .summary-card,.form-card{background:#fff;border-radius:26px;border:1px solid rgba(15,23,42,.08);box-shadow:0 18px 48px rgba(15,23,42,.10);padding:20px}
-        .summary-card.compact{padding:16px}
-        .summary-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
-        .eyebrow{margin:0;text-transform:uppercase;font-size:12px;letter-spacing:.2em;color:#94a3b8;font-weight:800}
-        .summary-card h2{font-size:18px;margin:2px 0 0}
-        .summary-card .details{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-        .summary-card .details li{padding:8px 10px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;display:flex;flex-direction:column}
-        .summary-card .details span{font-size:11px;font-weight:800;color:#94a3b8}
-        .summary-card .details strong{font-size:14px;color:#0f172a}
-        .billing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 12px}
-        .billing-grid .span2{grid-column:span 2}
-        .billing-grid label span{font-size:12px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em}
-        .billing-grid input,.billing-grid select{height:42px;border-radius:12px;border:1px solid #dfe7f5;padding:0 12px;font-size:14px}
-        .stroke-btn{height:36px;border-radius:12px;border:1px solid #d0d7e8;background:#fff;font-weight:800;color:#0f172a;margin-bottom:10px}
-        .row-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
-        .link-cancel{background:none;border:none;color:#64748b;font-weight:800;cursor:pointer}
-        .link-cancel:hover{color:#0f172a}
-        .btn{height:38px;border-radius:12px;padding:0 18px;font-weight:800;margin-left:auto}
-        .btn.ghost{border:1px solid #d0d7e8;background:#fff;color:#0f172a}
-        .btn.solid{border:1px solid #2563eb;background:#2563eb;color:#fff}
-        .promo-chip{display:inline-flex;margin-top:16px;padding:6px 12px;border-radius:999px;background:#eef2ff;color:#1d4ed8;font-weight:800}
-        .price-box{margin-top:18px;border-radius:18px;background:linear-gradient(135deg,#f8fafc,#ffffff);border:1px solid #e2e8f0;padding:18px;display:flex;flex-direction:column;gap:8px;font-weight:700;color:#0f172a}
-        .price-box .sum{font-size:18px;font-weight:900;display:flex;align-items:center;gap:6px;color:#0f172a}
-        .price-box .old{text-decoration:line-through;color:#94a3b8}
-        .price-box .arrow{color:#2563eb;font-weight:900}
-        .price-box .new{color:#0f172a}
-        .note{margin-top:12px;color:#475569;font-weight:600}
-        .note.small{font-size:13px;color:#94a3b8}
+        /* LEFT COL */
+        .trust-hero { margin-bottom: 40px; }
+        .badge-pill {
+          display: inline-block;
+          background: #d1fae5;
+          color: #065f46;
+          font-weight: 800;
+          font-size: 13px;
+          padding: 8px 16px;
+          border-radius: 99px;
+          margin-bottom: 20px;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+          border: 1px solid #a7f3d0;
+        }
+        h1 {
+          font-size: 48px;
+          line-height: 1.05;
+          color: #1e1b4b; /* Dark Indigo */
+          margin: 0 0 20px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+        }
+        .hero-sub {
+          font-size: 20px;
+          color: #475569;
+          line-height: 1.6;
+          margin-bottom: 48px;
+          font-weight: 400;
+        }
 
-        .form-card header{margin-bottom:14px}
-        .form-card .sub{color:#64748b;margin:4px 0 0}
-        .form-card .sub.action{color:#334155;font-weight:700}
-        .icon-btn{border:1px solid #e2e8f0;background:#fff;border-radius:12px;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 10px 25px rgba(15,23,42,.1);cursor:pointer}
-        .stripe-note{margin-top:16px;padding:12px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;display:flex;gap:10px;align-items:flex-start;color:#64748b;font-size:13px}
-        .stripe-note span{font-size:18px}
+        /* TIMELINE */
+        .timeline-box {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 50px;
+          position: relative;
+          padding: 12px;
+        }
+        .timeline-step {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          width: 100px;
+          position: relative;
+          z-index: 2;
+          opacity: 0;
+          animation: fadeInUp 0.6s ease forwards;
+        }
+        .timeline-step.delay-1 { animation-delay: 0.1s; }
+        .timeline-step.delay-3 { animation-delay: 0.3s; }
+        .timeline-step.delay-5 { animation-delay: 0.5s; }
 
-        .trust-block{max-width:980px;margin:10px auto 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-        .trust-item{display:flex;gap:10px;align-items:flex-start;justify-content:center;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 10px 26px rgba(15,23,42,.06)}
-        .trust-item .ico{font-size:18px;line-height:1}
-        .trust-item h4{margin:0 0 4px;color:#0f172a}
-        .trust-item p{margin:0;color:#64748b;font-size:14px}
+        .step-icon {
+          width: 40px;
+          height: 40px;
+          background: #fff;
+          border: 2px solid #e2e8f0;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 800;
+          color: #94a3b8;
+          margin-bottom: 12px;
+          transition: all 0.3s ease;
+          font-size: 16px;
+        }
+        @keyframes pulse-blue {
+          0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); transform: scale(1); }
+          70% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); transform: scale(1.1); }
+          100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); transform: scale(1); }
+        }
 
-        .trust-logos{max-width:980px;margin:0 auto 20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-        .trust-logos .badge{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;color:#0f172a;font-weight:800}
+        .timeline-step.active .step-icon {
+          border-color: #4f46e5;
+          background: #4f46e5;
+          color: #fff;
+          box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.15);
+          animation: pulse-blue 2s infinite;
+        }
+        .timeline-step.success .step-icon {
+          border-color: #10b981;
+          color: #10b981;
+          background: #ecfdf5;
+        }
+        .step-content strong {
+          display: block;
+          font-size: 14px;
+          color: #1e293b;
+          margin-bottom: 4px;
+        }
+        .step-content p {
+          font-size: 12px;
+          color: #64748b;
+          line-height: 1.3;
+          margin: 0;
+        }
+        .step-line {
+          flex: 1;
+          height: 2px;
+          background: #e2e8f0;
+          margin-top: 20px;
+          margin-left: -20px;
+          margin-right: -20px;
+          z-index: 1;
+          opacity: 0;
+          animation: growLine 0.6s ease forwards;
+        }
+        .step-line.delay-2 { animation-delay: 0.2s; }
+        .step-line.delay-4 { animation-delay: 0.4s; }
 
-        @media(max-width:640px){
-          .hero h1{font-size:30px}
-          .hero p{font-size:14.5px}
-          .hero-grid{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
-          .row-actions{flex-direction:column}
-          .btn{width:100%}
-          .content-grid{grid-template-columns:1fr;gap:18px}
+        .trust-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+        .trust-list li {
+          display: flex;
+          gap: 18px;
+          align-items: flex-start;
+        }
+        .trust-list .icon {
+          font-size: 22px;
+          background: #fff;
+          width: 48px;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 14px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+          border: 1px solid #f1f5f9;
+        }
+        .trust-list strong {
+          display: block;
+          color: #1e293b;
+          font-size: 17px;
+          margin-bottom: 4px;
+          font-weight: 700;
+        }
+        .trust-list p {
+          margin: 0;
+          color: #64748b;
+          font-size: 15px;
+          line-height: 1.5;
+        }
+
+        .summary-box {
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.9);
+          border-radius: 20px;
+          padding: 28px;
+          margin-top: 50px;
+          box-shadow: 0 20px 40px -10px rgba(0,0,0,0.05);
+        }
+        .summary-box h3 { margin: 0 0 20px; font-size: 16px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
+        .sum-row { display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 16px; color: #475569; }
+        .sum-row.discount { color: #16a34a; }
+        .divider { height: 1px; background: #e2e8f0; margin: 20px 0; }
+        .sum-row.total { font-weight: 700; color: #1e293b; font-size: 17px; }
+
+        .sum-row.today-highlight {
+          background: #ecfdf5;
+          margin: 12px -12px -12px;
+          padding: 16px 20px;
+          border-radius: 12px;
+          align-items: center;
+          border: 1px solid #a7f3d0;
+        }
+        .sum-row.today-highlight.pulse-animation {
+          animation: pulse-glow 3s infinite;
+        }
+        .sum-row.today-highlight span:first-child { font-weight: 700; color: #047857; }
+        .amount-zero { color: #059669; font-weight: 900; font-size: 24px; }
+
+        /* RIGHT COL */
+        .glass-panel {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(24px);
+          border-radius: 28px;
+          box-shadow:
+            0 25px 50px -12px rgba(79, 70, 229, 0.1),
+            0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+          padding: 40px;
+          border: 1px solid #e2e8f0;
+          transition: transform 0.3s ease;
+        }
+        .glass-panel:hover {
+          transform: translateY(-2px);
+          box-shadow:
+            0 30px 60px -15px rgba(79, 70, 229, 0.15),
+            0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+        }
+        .form-card header { margin-bottom: 32px; text-align: center; }
+        .form-card h2 { margin: 0 0 10px; font-size: 24px; color: #1e1b4b; font-weight: 800; }
+        .form-card p { margin: 0; color: #64748b; font-size: 15px; }
+
+        .secure-footer {
+          margin-top: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          font-size: 13px;
+          color: #94a3b8;
+          background: #f8fafc;
+          padding: 12px;
+          border-radius: 10px;
+          border: 1px solid #f1f5f9;
+        }
+
+        .billing-summary {
+          margin-top: 32px;
+          padding: 0 16px;
+        }
+        .billing-summary .head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .billing-summary button { background: none; border: none; color: #4f46e5; cursor: pointer; font-size: 13px; font-weight: 600; transition: color 0.2s; }
+        .billing-summary button:hover { color: #4338ca; }
+        .billing-summary p { font-size: 15px; color: #475569; line-height: 1.6; }
+
+        .mini-edit { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+        .mini-edit input { padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; transition: border-color 0.2s; }
+        .mini-edit input:focus { border-color: #4f46e5; outline: none; }
+        .mini-edit .row { display: flex; gap: 10px; }
+        .save-btn { background: #1e1b4b; color: #fff; border: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; }
+        .save-btn:hover { background: #312e81; }
+
+        @media (max-width: 1000px) {
+          .pay-container { grid-template-columns: 1fr; gap: 50px; }
+          .left-col { order: 1; }
+          .right-col { order: 2; }
+          h1 { font-size: 36px; }
+          .timeline-box { overflow-x: auto; padding-bottom: 10px; }
+          .timeline-step { min-width: 90px; }
         }
       `}</style>
-      <div className="page-cancel">
-        <button className="link-cancel" type="button" onClick={() => { try { window.history.back(); } catch { try { window.location.assign('/sign'); } catch { } } }}>Abbrechen und zurück</button>
-      </div>
     </main>
   );
 }

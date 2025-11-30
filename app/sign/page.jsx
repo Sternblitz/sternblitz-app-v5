@@ -24,7 +24,9 @@ export default function SignPage() {
     company: "",
     firstName: "",
     lastName: "",
-    lastName: "",
+    street: "",
+    zip: "",
+    city: "",
     email: "",
     phone: "",
     customDiscount: 0,
@@ -46,6 +48,9 @@ export default function SignPage() {
     company: "",
     firstName: "",
     lastName: "",
+    street: "",
+    zip: "",
+    city: "",
     email: "",
     phone: "",
   });
@@ -96,6 +101,9 @@ export default function SignPage() {
         company: p?.company || "",
         firstName: p?.firstName || "",
         lastName: p?.lastName || "",
+        street: p?.street || "",
+        zip: p?.zip || "",
+        city: p?.city || "",
         email: p?.email || "",
         phone: p?.phone || "",
         customDiscount: Number(p?.customDiscount || 0),
@@ -142,6 +150,9 @@ export default function SignPage() {
         company: p?.company || "",
         firstName: p?.firstName || "",
         lastName: p?.lastName || "",
+        street: p?.street || "",
+        zip: p?.zip || "",
+        city: p?.city || "",
         email: p?.email || "",
         phone: p?.phone || "",
       });
@@ -188,6 +199,9 @@ export default function SignPage() {
             company: p?.company || "",
             firstName: p?.firstName || "",
             lastName: p?.lastName || "",
+            street: p?.street || "",
+            zip: p?.zip || "",
+            city: p?.city || "",
             email: p?.email || "",
             phone: p?.phone || "",
             customDiscount: Number(p?.customDiscount || 0),
@@ -198,6 +212,9 @@ export default function SignPage() {
             company: next.company,
             firstName: next.firstName,
             lastName: next.lastName,
+            street: next.street,
+            zip: next.zip,
+            city: next.city,
             email: next.email,
             phone: next.phone,
           });
@@ -395,6 +412,9 @@ export default function SignPage() {
         company: summary.company,
         firstName: summary.firstName,
         lastName: summary.lastName,
+        street: summary.street,
+        zip: summary.zip,
+        city: summary.city,
         email: summary.email,
         phone: summary.phone,
         counts: summary.counts,
@@ -467,6 +487,9 @@ export default function SignPage() {
     if (!(summary.company || '').trim() || (summary.company || '').trim().length < 2) errs.company = 'Bitte Firma angeben';
     if (!(summary.firstName || '').trim() || (summary.firstName || '').trim().length < 2) errs.firstName = 'Bitte Vorname (min. 2 Zeichen)';
     if (!(summary.lastName || '').trim() || (summary.lastName || '').trim().length < 2) errs.lastName = 'Bitte Nachname (min. 2 Zeichen)';
+    if (!(summary.street || '').trim() || (summary.street || '').trim().length < 3) errs.street = 'Bitte Straße angeben';
+    if (!(summary.zip || '').trim() || (summary.zip || '').trim().length < 3) errs.zip = 'Bitte PLZ angeben';
+    if (!(summary.city || '').trim() || (summary.city || '').trim().length < 2) errs.city = 'Bitte Stadt angeben';
     if (!emailOk) errs.email = 'Bitte gültige E‑Mail angeben';
     if (phoneDigits.length < 6) errs.phone = 'Bitte gültige Telefonnummer angeben';
     if (Object.keys(errs).length) {
@@ -529,6 +552,9 @@ export default function SignPage() {
           company: summary.company,
           firstName: summary.firstName,
           lastName: summary.lastName,
+          street: summary.street,
+          zip: summary.zip,
+          city: summary.city,
           email: summary.email,
           phone: summary.phone,
           signaturePng,
@@ -865,6 +891,10 @@ export default function SignPage() {
               <div><b>Firma:</b> {summary.company || "—"}</div>
               <div><b>Vorname:</b> {summary.firstName || "—"}</div>
               <div><b>Nachname:</b> {summary.lastName || "—"}</div>
+              <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Rechnungsadresse</div>
+              <div><b>Straße:</b> {summary.street || "—"}</div>
+              <div><b>PLZ/Stadt:</b> {(summary.zip || "—") + " " + (summary.city || "")}</div>
+              <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Kommunikation</div>
               <div><b>E-Mail:</b> {summary.email || "—"}</div>
               <div><b>Telefon:</b> {summary.phone || "—"}</div>
             </div>
@@ -883,6 +913,24 @@ export default function SignPage() {
                   <input value={contactDraft.lastName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, lastName: v })); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
                   {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
                 </label>
+
+                <div style={{ gridColumn: "1/-1", marginTop: 12, marginBottom: 4, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Rechnungsadresse</div>
+
+                <label style={{ gridColumn: "1/-1" }}><span>Straße & Hausnummer</span>
+                  <input value={contactDraft.street} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, street: v })); setErrors((er) => ({ ...er, street: v.trim().length >= 3 ? null : 'Bitte Straße angeben' })); }} />
+                  {errors.street ? <div className="err-msg">{errors.street}</div> : null}
+                </label>
+                <label><span>PLZ</span>
+                  <input value={contactDraft.zip} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, zip: v })); setErrors((er) => ({ ...er, zip: v.trim().length >= 3 ? null : 'Bitte PLZ angeben' })); }} />
+                  {errors.zip ? <div className="err-msg">{errors.zip}</div> : null}
+                </label>
+                <label><span>Stadt</span>
+                  <input value={contactDraft.city} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, city: v })); setErrors((er) => ({ ...er, city: v.trim().length >= 2 ? null : 'Bitte Stadt angeben' })); }} />
+                  {errors.city ? <div className="err-msg">{errors.city}</div> : null}
+                </label>
+
+                <div style={{ gridColumn: "1/-1", marginTop: 12, marginBottom: 4, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Kommunikation</div>
+
                 <label><span>E-Mail</span>
                   <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v || '').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
                   {errors.email ? <div className="err-msg">{errors.email}</div> : null}

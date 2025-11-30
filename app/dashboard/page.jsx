@@ -61,6 +61,9 @@ export default function DashboardPage() {
   const [company, setCompany] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [street, setStreet] = useState("");
+  const [zip, setZip] = useState("");
+  const [city, setCity] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
 
@@ -132,6 +135,9 @@ export default function DashboardPage() {
       setCompany(d.company || "");
       setFirstName(d.firstName || "");
       setLastName(d.lastName || "");
+      setStreet(d.street || "");
+      setZip(d.zip || "");
+      setCity(d.city || "");
       setEmail(d.email || "");
       setPhone(d.phone || "");
 
@@ -225,6 +231,9 @@ export default function DashboardPage() {
       company,
       firstName,
       lastName,
+      street,
+      zip,
+      city,
       email,
       phone,
       counts, // für Prefill der /sign Seite
@@ -451,8 +460,10 @@ export default function DashboardPage() {
           </div>
 
           {/* Kontaktdaten */}
-          <div className="group">
-            <div className="group-title">Kontaktdaten</div>
+          <div className="group section-spacer">
+            <div className="group-title">
+              <span className="icon">👤</span> Kontaktdaten
+            </div>
 
             <div className="field">
               <label>Firmenname <span className="req">*</span></label>
@@ -486,6 +497,52 @@ export default function DashboardPage() {
                   required
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="group section-spacer">
+            <div className="group-title">
+              <span className="icon">📍</span> Rechnungsadresse
+            </div>
+
+            <div className="field">
+              <label>Straße & Hausnummer <span className="req">*</span></label>
+              <input
+                type="text"
+                placeholder="Musterstraße 123"
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="row">
+              <div className="field half">
+                <label>PLZ <span className="req">*</span></label>
+                <input
+                  type="text"
+                  placeholder="12345"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="field half">
+                <label>Stadt <span className="req">*</span></label>
+                <input
+                  type="text"
+                  placeholder="Berlin"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="group section-spacer">
+            <div className="group-title">
+              <span className="icon">📞</span> Kommunikation
             </div>
 
             <div className="row">
@@ -622,7 +679,9 @@ export default function DashboardPage() {
 
         .lead-form{padding:18px 22px 26px}
         .group{margin-top:18px}
-        .group-title{font-family:"Outfit",sans-serif;font-weight:700;font-size:18px;color:#0f172a;margin-bottom:8px}
+        .section-spacer{margin-top:32px; padding-top:24px; border-top:1px solid #f1f5f9}
+        .group-title{font-family:"Outfit",sans-serif;font-weight:700;font-size:18px;color:#0f172a;margin-bottom:12px;display:flex;align-items:center}
+        .group-title .icon{margin-right:8px;font-size:20px}
         .req{color:#e11d48;font-weight:800}
 
         .profile-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
