@@ -935,12 +935,15 @@ export default function OrdersPage() {
         <div className="actions">
           {me?.role === "ADMIN" && (
             <>
-              <Link className="action-btn invite-btn" href="/dashboard/team">
+              <button type="button" className="action-btn" onClick={() => router.push("/admin/crm")}>
+                CRM 👑
+              </button>
+              <button type="button" className="action-btn" onClick={() => router.push("/dashboard/team")}>
                 Invite 👥
-              </Link>
+              </button>
               <button
                 type="button"
-                className="action-btn special"
+                className="action-btn"
                 onClick={() => {
                   const amount = prompt("Rabatt in € eingeben (z.B. 50):");
                   if (!amount) return;
@@ -955,9 +958,9 @@ export default function OrdersPage() {
               </button>
             </>
           )}
-          <Link className="action-btn" href="/dashboard">
-            Neuer Auftrag
-          </Link>
+          <button type="button" className="action-btn" onClick={() => router.push("/dashboard")}>
+            Neuer Auftrag ➕
+          </button>
         </div>
       </header>
 
@@ -1081,10 +1084,35 @@ export default function OrdersPage() {
         .title .sub { margin: 0; color:#64748b; font-size:14px; font-weight:600; }
         .title h1 { font-size: 30px; margin:0; font-weight:900; letter-spacing:-0.2px; }
         .title .sub { margin: 0; color:#64748b; font-size:14px; font-weight:600; }
-        .actions { display:flex; gap: 10px; }
-        .action-btn { display:inline-flex; align-items:center; height:38px; padding:0 12px; border-radius:10px; background:#0b6cf2; color:#fff; font-weight:800; border:1px solid rgba(11,108,242,.22); cursor: pointer; text-decoration: none; font-size: 14px; }
-        .action-btn.special { background:#fff; color:#0b6cf2; border-color:#e5e7eb; }
-        .action-btn.special:hover { background:#f0f6ff; }
+        .actions { display:flex; gap: 12px; flex-wrap: wrap; }
+        .action-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 44px;
+          padding: 0 24px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #0b6cf2 0%, #3b82f6 100%);
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 15px;
+          border: 1px solid rgba(11, 108, 242, 0.25);
+          box-shadow: 0 8px 22px rgba(11, 108, 242, 0.28);
+          cursor: pointer;
+          text-decoration: none;
+          transition: all 0.18s ease;
+          letter-spacing: 0.2px;
+        }
+        .action-btn:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.05);
+          box-shadow: 0 12px 28px rgba(11, 108, 242, 0.35);
+          border-color: rgba(11, 108, 242, 0.35);
+        }
+        .action-btn:active {
+          transform: translateY(0);
+          filter: brightness(0.96);
+        }
 
         .summary-grid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 12px; }
         .kpi { background:#ffffff; border:1px solid #eef2f7; border-radius: 14px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.04); }
