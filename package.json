@@ -1,0 +1,47 @@
+{
+  "name": "sternblitz-sales",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@googlemaps/js-api-loader": "^2.0.2",
+    "@stripe/react-stripe-js": "^2.7.1",
+    "@stripe/stripe-js": "^3.5.0",
+    "@supabase/auth-helpers-nextjs": "0.10.0",
+    "@supabase/supabase-js": "2.46.1",
+    "canvas-confetti": "^1.9.4",
+    "lucide-react": "^0.555.0",
+    "next": "14.2.3",
+    "pdf-lib": "1.17.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-joyride": "^2.9.3",
+    "recharts": "^3.5.1",
+    "resend": "3.2.0",
+    "stripe": "^16.0.0"
+  },
+  "optionalDependencies": {
+    "@next/swc-darwin-arm64": "14.2.3",
+    "@next/swc-darwin-x64": "14.2.3",
+    "@next/swc-linux-arm64-gnu": "14.2.3",
+    "@next/swc-linux-x64-gnu": "14.2.3",
+    "@next/swc-win32-x64-msvc": "14.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "5.9.3"
+  }
+}
