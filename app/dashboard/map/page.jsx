@@ -22,6 +22,70 @@ export default function MapPage() {
 
     const [filter, setFilter] = useState("all"); // all, todo, interested, later, customer
     const [dateFilter, setDateFilter] = useState("all"); // all, today, week
+    const [isScanning, setIsScanning] = useState(false);
+    const [scanProgress, setScanProgress] = useState("");
+
+    const BLOCKED_TYPES = [
+        "tourist_attraction", "park", "school", "cemetery", "place_of_worship",
+        "local_government_office", "museum", "art_gallery", "zoo", "aquarium",
+        "stadium", "embassy", "funeral_home", "rv_park", "campground", "library",
+        "primary_school", "secondary_school", "university", "town_square"
+    ];
+
+    // Deep Scan Queries (Types & Keywords mixed)
+    const SCAN_QUERIES = [
+        // Gastro & Imbiss
+        { type: "restaurant" },
+        { type: "cafe" },
+        { type: "bar" },
+        { type: "bakery" },
+        { type: "meal_takeaway" },
+        { type: "meal_delivery" },
+        { keyword: "Döner" },
+        { keyword: "Kebab" },
+        { keyword: "Pizza" },
+        { keyword: "Burger" },
+        { keyword: "Imbiss" },
+        { keyword: "Currywurst" },
+        { keyword: "Sushi" },
+
+        // Beauty & Wellness
+        { type: "hair_care" },
+        { keyword: "Barber" },
+        { type: "beauty_salon" },
+        { keyword: "Nagelstudio" },
+        { keyword: "Kosmetik" },
+        { keyword: "Wimpern" },
+        { type: "spa" },
+        { type: "physiotherapist" },
+
+        // Services & Retail (No Clothing)
+        { type: "florist" },
+        { type: "liquor_store" }, // Spätis
+        { type: "car_repair" },
+        { type: "laundry" },
+        { type: "locksmith" },
+        { type: "dentist" },
+        { type: "doctor" },
+        { type: "real_estate_agency" },
+        { type: "insurance_agency" },
+
+        // Missing Important Categories
+        { type: "gym" }, // Fitness
+        { keyword: "Fitnessstudio" },
+        { type: "car_dealer" }, // Autohändler
+        { keyword: "Shisha" }, // Shisha Bars
+        { keyword: "Hookah" },
+        { keyword: "Kiosk" }, // Spätis/Kioske
+        { keyword: "Späti" },
+        { keyword: "Späti" },
+        { type: "night_club" }, // Clubs
+
+        // Niche
+        { keyword: "Tattoo" },
+        { keyword: "Solarium" },
+        { keyword: "Sonnenstudio" },
+    ];
 
     // Load Visits from DB and convert to Places
     const loadVisits = async () => {
@@ -272,55 +336,39 @@ export default function MapPage() {
         return "Geschäft";
     };
 
-    // Search Nearby (Smart Street Scan)
+    // Deep Scan (Street Sweeper)
     const searchNearby = () => {
-        if (!mapInstance || !placesService) return;
+        if (!mapInstance || !placesService || isScanning) return;
         const center = mapInstance.getCenter();
-        const zoom = mapInstance.getZoom();
-        if (!center || !zoom) return;
+        if (!center) return;
 
-        // Calculate "Street Scan" radius based on zoom
-        // D2D usually happens at zoom 16-19.
-        // Zoom 18 ~ 100m radius visually.
-        // We want high density, so we keep radius small to force "all" results.
-        // If zoomed out (e.g. 14), we still want "local" density at the center, not a huge city-wide search.
+        setIsScanning(true);
+        setScanProgress("Starte Deep Scan...");
 
-        // Base radius in meters
-        let radius = 150;
-        if (zoom <= 15) radius = 500;
-        else if (zoom === 16) radius = 300;
-        else if (zoom === 17) radius = 200;
-        else if (zoom >= 18) radius = 120;
-
-        // 5-Point Pattern (Quincunx) to maximize coverage in the center
-        // Center + 4 overlapping circles at N, S, E, W
-        // Offset should be slightly less than radius to ensure overlap
-        const offsetMeters = radius * 0.8;
-        const rEarth = 6378137; // Earth radius in meters
-        const pi = Math.PI;
-        const lat = center.lat();
-        const lng = center.lng();
-
-        const latOffset = (offsetMeters / rEarth) * (180 / pi);
-        const lngOffset = (offsetMeters / rEarth) * (180 / pi) / Math.cos(lat * pi / 180);
-
-        const centers = [
-            { lat: lat, lng: lng }, // Center
-            { lat: lat + latOffset, lng: lng }, // North
-            { lat: lat - latOffset, lng: lng }, // South
-            { lat: lat, lng: lng + lngOffset }, // East
-            { lat: lat, lng: lng - lngOffset }, // West
-        ];
+        // Fixed radius for walking distance density
+        const radius = 300;
+        const centerLoc = { lat: center.lat(), lng: center.lng() };
 
         let allResults = [];
-        let completed = 0;
+        let completedCats = 0;
+        const totalCats = SCAN_QUERIES.length;
 
         const checkDone = () => {
-            completed++;
-            if (completed === centers.length) {
-                // Deduplicate
+            completedCats++;
+            setScanProgress(`Scanne... ${Math.round((completedCats / totalCats) * 100)}%`);
+
+            if (completedCats === totalCats) {
+                setIsScanning(false);
+                setScanProgress("");
+
+                // Deduplicate & Filter
                 const unique = new Map();
-                allResults.forEach(p => unique.set(p.place_id, p));
+                allResults.forEach(p => {
+                    const isBlocked = p.types?.some(t => BLOCKED_TYPES.includes(t));
+                    if (isBlocked) return;
+                    unique.set(p.place_id, p);
+                });
+
                 const processed = Array.from(unique.values()).map(p => {
                     const loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
                     const dist = myLoc ? getDistance(myLoc, loc) : null;
@@ -330,31 +378,25 @@ export default function MapPage() {
             }
         };
 
-        centers.forEach(c => {
-            const request = {
-                location: c,
-                radius: radius, // Tight radius for high density
-                type: "establishment",
-            };
+        // Fire parallel requests for each query
+        SCAN_QUERIES.forEach((q, idx) => {
+            // Stagger requests slightly to avoid instant rate limit
+            setTimeout(() => {
+                const request = {
+                    location: centerLoc,
+                    radius: radius,
+                };
 
-            let pageCount = 0;
-            const callback = (results, status, pagination) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                    allResults.push(...results);
-                }
+                if (q.type) request.type = q.type;
+                if (q.keyword) request.keyword = q.keyword;
 
-                // Fetch up to 3 pages (60 results) per circle
-                if (pagination && pagination.hasNextPage && pageCount < 2) {
-                    pageCount++;
-                    setTimeout(() => {
-                        pagination.nextPage();
-                    }, 2000);
-                } else {
+                placesService.nearbySearch(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                        allResults.push(...results);
+                    }
                     checkDone();
-                }
-            };
-
-            placesService.nearbySearch(request, callback);
+                });
+            }, idx * 120); // 120ms stagger
         });
     };
 
@@ -411,12 +453,30 @@ export default function MapPage() {
             });
         }
 
-        // Sort
+        // Sort by Potential (Bad ratings first, ignore small ones)
         res.sort((a, b) => {
-            const aLow = (a.rating || 5) < 4.6;
-            const bLow = (b.rating || 5) < 4.6;
-            if (aLow && !bLow) return -1;
-            if (!aLow && bLow) return 1;
+            // Potential Score:
+            // 3. Rating 1.0 - 4.5 AND Reviews >= 10 (High Potential)
+            // 2. No Rating OR Reviews < 10 (Irrelevant / New) -> actually user said < 10 is irrelevant
+            // 1. Rating > 4.5 (Good)
+
+            const getScore = (p) => {
+                const r = p.rating;
+                const c = p.user_ratings_total || 0;
+
+                if (c < 10) return 0; // Irrelevant (Too small)
+                if (!r) return 0; // Unknown/New -> treat as small
+
+                if (r <= 4.5) return 3; // Bad/Mediocre -> TARGET
+                return 1; // Good -> Low priority
+            };
+
+            const scoreA = getScore(a);
+            const scoreB = getScore(b);
+
+            if (scoreA !== scoreB) return scoreB - scoreA; // High score first
+
+            // Secondary sort: Distance
             return (a.dist || 0) - (b.dist || 0);
         });
 
@@ -515,7 +575,13 @@ export default function MapPage() {
                 </div>
 
                 <button className="btn-locate" onClick={() => locateMe()}>📍</button>
-                <button className="btn-search tour-map-scan" onClick={searchNearby}>🔍 Bereich suchen</button>
+                <button
+                    className={`btn-search tour-map-scan ${isScanning ? "scanning" : ""}`}
+                    onClick={searchNearby}
+                    disabled={isScanning}
+                >
+                    {isScanning ? scanProgress : "🔍 Deep Scan (300m)"}
+                </button>
             </div>
 
             {/* LIST SECTION */}
@@ -541,12 +607,13 @@ export default function MapPage() {
                 </div>
                 <div className="list-content">
                     {filteredPlaces.map((p) => {
-                        const isTarget = (p.rating || 5) < 4.6;
+                        const isTarget = (p.rating || 5) < 4.6 && (p.user_ratings_total || 0) >= 10;
+                        const isIrrelevant = (p.user_ratings_total || 0) < 10;
                         const visit = visits[p.place_id];
                         return (
                             <div
                                 key={p.place_id}
-                                className={`place-card ${isTarget ? 'target' : ''} ${visit ? 'visited' : ''}`}
+                                className={`place-card ${isTarget ? 'target' : ''} ${visit ? 'visited' : ''} ${isIrrelevant ? 'irrelevant' : ''}`}
                                 onClick={() => {
                                     setSelectedPlace({ ...p, visit });
                                     mapInstance?.panTo(p.loc);
@@ -556,7 +623,7 @@ export default function MapPage() {
                                     <div className="pc-name">{p.name}</div>
                                     <div className="pc-sub">{p.category ? <span className="cat-badge">{p.category}</span> : null} {p.vicinity}</div>
                                     <div className="pc-meta">
-                                        <span className={`pc-rating ${isTarget ? 'bad' : 'good'}`}>
+                                        <span className={`pc-rating ${isTarget ? 'bad' : (isIrrelevant ? 'muted' : 'good')}`}>
                                             {p.rating ? p.rating.toFixed(1) : "-"} ⭐ <span className="pc-count">({p.user_ratings_total || 0})</span>
                                         </span>
                                         <span className="pc-dist">{p.dist ? Math.round(p.dist) + "m" : ""}</span>
@@ -662,15 +729,18 @@ export default function MapPage() {
 
             <style jsx>{`
                 .split-view { display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-                .map-section { flex: 0 0 45%; position: relative; }
-                .map-container { width: 100%; height: 100%; }
+                .map-section { flex: 0 0 45%; position: relative; display: flex; flex-direction: column; }
+                .map-container { width: 100%; flex: 1; }
 
                 .btn-search {
                     position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
                     background: #0f172a; color: #fff; border: none; padding: 12px 24px;
                     border-radius: 99px; font-weight: 700; box-shadow: 0 8px 20px rgba(0,0,0,0.2);
                     cursor: pointer; z-index: 10; font-size: 14px; display: flex; align-items: center; gap: 8px;
-                    margin-bottom: 10px;
+                    margin-bottom: 10px; transition: all 0.2s; white-space: nowrap;
+                }
+                .btn-search.scanning {
+                    background: #0b6cf2; cursor: wait;
                 }
                 .btn-locate {
                     position: absolute; top: 20px; right: 20px;
@@ -719,6 +789,7 @@ export default function MapPage() {
                 .place-card:active { background: #f1f5f9; }
                 .place-card.target { background: #fff5f5; }
                 .place-card.visited { opacity: 0.7; background: #f8fafc; }
+                .place-card.irrelevant { opacity: 0.5; filter: grayscale(0.8); }
 
                 .pc-name { font-weight: 700; color: #0f172a; font-size: 15px; margin-bottom: 2px; }
                 .pc-sub { font-size: 13px; color: #64748b; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
@@ -726,6 +797,7 @@ export default function MapPage() {
                 .pc-rating { font-weight: 700; }
                 .pc-rating.bad { color: #dc2626; }
                 .pc-rating.good { color: #16a34a; }
+                .pc-rating.muted { color: #94a3b8; font-weight: 400; }
                 .pc-count { font-weight: 400; color: #94a3b8; font-size: 12px; }
                 .pc-dist { color: #94a3b8; font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
 
