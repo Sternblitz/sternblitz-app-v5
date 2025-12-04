@@ -3,10 +3,13 @@ import TopNav from "./components/TopNav";
 import HideTopNavOnLogin from "./components/HideTopNavOnLogin";
 import Tour from "./dashboard/Tour";
 
+export const viewport = {
+  themeColor: "#0b6cf2",
+};
+
 export const metadata = {
   title: "Sternblitz Sales",
   description: "Vertriebsplattform",
-  themeColor: "#0b6cf2",
   manifest: "/site.webmanifest",
   icons: {
     icon: [

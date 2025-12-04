@@ -631,13 +631,13 @@ export default function DashboardPage() {
 
         /* ————— 3) SCHRITTE ————— */
         .steps{ margin: 20px 0; padding:0; }
-        .steps-row{ max-width:1208px; margin:0 auto; padding: 4px; list-style:none; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap }
+        .steps-row{ max-width:1208px; margin:0 auto; padding: 4px; list-style:none; display:flex; align-items:stretch; justify-content:center; gap:10px; }
         .step-card{
           position:relative; overflow:hidden; border-radius:11px; padding:8px 10px;
           background: linear-gradient(180deg, rgba(248,250,253,.78) 0%, rgba(248,250,253,.9) 100%);
           border:1px solid rgba(15,23,42,.05);
           box-shadow:0 4px 12px rgba(2,6,23,.04);
-          display:flex; align-items:center; gap:10px; min-height:44px; flex:0 0 220px;
+          display:flex; align-items:center; gap:10px; min-height:44px; flex:1;
         }
         .badge{ flex:none; width:22px; height:22px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#0b6cf2; background:#eef4ff; border:1px solid #dbeafe; font-size:11.5px }
         .emoji{ font-size:16px; line-height:1; }
@@ -751,7 +751,7 @@ export default function DashboardPage() {
         }
 
         /* Mobile */
-        @media (max-width:640px){
+        @media (max-width:820px){
           .steps-row{ flex-direction:column; align-items:center; gap:8px; max-width:560px }
           .step-card{ width:100%; max-width:360px; flex:0 0 auto; min-height:42px; padding:8px 10px; background: linear-gradient(180deg, rgba(248,250,253,.74) 0%, rgba(248,250,253,.86) 100%) }
           .badge{ width:20px; height:20px }

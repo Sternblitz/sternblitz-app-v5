@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; // Rebuild trigger
 
 const RANGE_OPTIONS = [
   { value: "all", label: "Alle" },
@@ -1180,11 +1180,42 @@ function StatusControl({ value, onChange, disabled }) {
     { value: "WAITING_PAYMENT", label: "Warte auf Zahlung" },
   ];
   return (
-    <select className="status-select" value={value || "NEW"} onChange={(e) => onChange?.(e.target.value)} disabled={disabled}>
-      {opts.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
+    <>
+      <select className="status-select" value={value || "NEW"} onChange={(e) => onChange?.(e.target.value)} disabled={disabled}>
+        {opts.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <style jsx>{`
+        .status-select {
+          height: 34px;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1; /* Visible border */
+          background-color: #f8fafc; /* Light background */
+          padding: 0 32px 0 12px;
+          font-weight: 700;
+          font-size: 13px;
+          color: #0f172a;
+          cursor: pointer;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 8px center;
+          background-size: 14px;
+          transition: all 0.15s ease;
+        }
+        .status-select:hover {
+          border-color: #94a3b8;
+          background-color: #f1f5f9;
+          box-shadow: 0 2px 8px rgba(0,0,0,.04);
+        }
+        .status-select:focus {
+          outline: none;
+          border-color: #0b6cf2;
+          box-shadow: 0 0 0 3px rgba(11,108,242,.15);
+        }
+      `}</style>
+    </>
   );
 }
 
@@ -1302,8 +1333,12 @@ function SalesRing({ rows }) {
   const totalPrev7 = prev7Keys.reduce((a, k) => a + (counts.get(k) || 0), 0);
   const goal = totalPrev7 > 0 ? totalPrev7 : 10; // dynamisch, min. 10
   const pct = goal > 0 ? Math.min(100, Math.round((total7 / goal) * 100)) : (total7 > 0 ? 100 : 0);
-  const deg = (pct / 100) * 360;
-  const gradient = `conic-gradient(#0b6cf2 0deg ${deg}deg, #e5e7eb ${deg}deg 360deg)`;
+
+  // SVG Calculations
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
+
   const euro = (n) => (Number.isFinite(n) ? new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n) : "—");
 
   const weekRevenue = total7 * 299;
@@ -1311,8 +1346,32 @@ function SalesRing({ rows }) {
 
   return (
     <div className="kpi-wrap">
-      <div className="ring" style={{ background: gradient }}>
-        <div className="hole">
+      <div className="ring-container">
+        <svg width="120" height="120" viewBox="0 0 120 120" className="ring-svg">
+          {/* Background Track */}
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth="12"
+          />
+          {/* Progress Arc */}
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            fill="none"
+            stroke="#0b6cf2"
+            strokeWidth="12"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform="rotate(-90 60 60)"
+          />
+        </svg>
+        <div className="hole-content">
           <div className="big">{total7}</div>
           <div className="sub">7 Tage</div>
         </div>
@@ -1332,17 +1391,18 @@ function SalesRing({ rows }) {
         </div>
       </div>
       <style jsx>{`
-        .kpi-wrap { display:flex; align-items:center; gap: 16px; flex-wrap: wrap; background:#fff; border:1px solid #eef2f7; border-radius: 16px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.04); width:100%; box-sizing:border-box; }
-        .ring { width: 120px; height: 120px; border-radius: 50%; position: relative; flex: none; }
-        .hole { position:absolute; inset: 16px; border-radius: 50%; background: #fff; display:flex; flex-direction: column; align-items:center; justify-content:center; border: 1px solid #eef2f7; }
-        .big { font-size: 22px; font-weight: 800; line-height: 1; }
+        .kpi-wrap { display:flex; align-items:center; gap: 16px; flex-wrap: wrap; background:#fff; border-radius: 16px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.04); width:100%; box-sizing:border-box; }
+        .ring-container { position: relative; width: 120px; height: 120px; flex: none; display: flex; align-items: center; justify-content: center; }
+        .ring-svg { transform: rotate(0deg); }
+        .hole-content { position:absolute; inset: 0; display:flex; flex-direction: column; align-items:center; justify-content:center; pointer-events: none; }
+        .big { font-size: 22px; font-weight: 800; line-height: 1; color: #0f172a; }
         .sub { font-size: 12px; color:#64748b; margin-top: 2px; }
         .stats { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; flex:1; min-width:0; }
         .it { background:#f8fafc; border:1px solid #eef2f7; border-radius: 12px; padding: 10px 12px; }
         .lab { font-size: 12px; color:#64748b; }
         .val { font-weight: 800; margin-top: 4px; display:flex; align-items:center; gap:8px; }
-        @media (max-width: 960px) { .kpi-wrap { flex-direction: column; align-items: stretch; gap: 12px; } .ring { align-self: center; width: 110px; height: 110px; } .stats { width: 100%; grid-template-columns: repeat(2, minmax(0,1fr)); } }
-        @media (max-width: 560px) { .ring { width: 100px; height: 100px; } .stats { grid-template-columns: 1fr; } }
+        @media (max-width: 960px) { .kpi-wrap { flex-direction: column; align-items: stretch; gap: 12px; } .ring-container { align-self: center; width: 110px; height: 110px; } .ring-svg { width: 110px; height: 110px; } .stats { width: 100%; grid-template-columns: repeat(2, minmax(0,1fr)); } }
+        @media (max-width: 560px) { .ring-container { width: 100px; height: 100px; } .ring-svg { width: 100px; height: 100px; } .stats { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );

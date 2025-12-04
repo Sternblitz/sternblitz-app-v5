@@ -30,7 +30,7 @@ export default function LiveSimulator() {
     setData(null);
     setError("");
     setLoadingText("");
-    try { sessionStorage.removeItem("sb_selected_profile"); } catch {}
+    try { sessionStorage.removeItem("sb_selected_profile"); } catch { }
   };
 
   useEffect(() => {
@@ -52,15 +52,15 @@ export default function LiveSimulator() {
           if (storedCode) code = storedCode;
           const storedDiscount = sessionStorage.getItem("sb_ref_discount");
           if (storedDiscount) discount = Number(storedDiscount) || 0;
-        } catch {}
+        } catch { }
         if (typeof document !== "undefined" && !code) {
           const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
           if (match) code = decodeURIComponent(match[1]);
         }
         if (!isFresh) {
           // Clear stale promo to avoid sticky discount when not fresh from /empfehlen
-          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch {}
-          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch {}
+          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch { }
+          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch { }
           setPromo({ code: null, discount: 0 });
           return;
         }
@@ -68,7 +68,7 @@ export default function LiveSimulator() {
           if (!discount) discount = 2500;
           setPromo({ code: code.toUpperCase(), discount });
         }
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -94,10 +94,10 @@ export default function LiveSimulator() {
         // Profil merken (Formular zieht es beim Klick auf „Jetzt loslegen“)
         try {
           sessionStorage.setItem("sb_selected_profile", JSON.stringify(sel));
-        } catch {}
+        } catch { }
         try {
           window.dispatchEvent(new CustomEvent("sb:profile", { detail: sel }));
-        } catch {}
+        } catch { }
 
         // Input zeigt den gewählten Eintrag
         setInputValue(`${name}${address ? ", " + address : ""}`);
@@ -154,7 +154,7 @@ export default function LiveSimulator() {
             breakdown: nextData.breakdown,
           })
         );
-      } catch {}
+      } catch { }
       try {
         window.dispatchEvent(
           new CustomEvent("sb:stats", {
@@ -165,7 +165,7 @@ export default function LiveSimulator() {
             },
           })
         );
-      } catch {}
+      } catch { }
     } catch (e) {
       stop();
       setLoadingText("");
@@ -200,7 +200,7 @@ export default function LiveSimulator() {
       if (finalName) {
         try {
           sessionStorage.setItem('sb_selected_profile', JSON.stringify({ name: finalName, address: finalAddress || '', url }));
-        } catch {}
+        } catch { }
         setInputValue(`${finalName}${finalAddress ? ", " + finalAddress : ''}`);
         runFetch(finalName, finalAddress);
       } else {
@@ -216,15 +216,15 @@ export default function LiveSimulator() {
               runFetch(n, a);
             }
           }
-        } catch {}
+        } catch { }
       }
 
       // Option preselect
       const pick = opt || (sessionStorage.getItem('sb_selected_option') || '');
-      if (pick && ["123","12","1"].includes(pick)) {
+      if (pick && ["123", "12", "1"].includes(pick)) {
         selectOption(pick);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // ENTER startet Suche (Fallback ohne Dropdown-Klick)
@@ -240,7 +240,7 @@ export default function LiveSimulator() {
 
     try {
       sessionStorage.setItem("sb_selected_profile", JSON.stringify(sel));
-    } catch {}
+    } catch { }
 
     runFetch(name, address);
   };
@@ -301,23 +301,23 @@ export default function LiveSimulator() {
     setActiveOpt(opt);
     try {
       sessionStorage.setItem("sb_selected_option", opt);
-    } catch {}
+    } catch { }
     try {
       window.dispatchEvent(new CustomEvent("sb:option-changed", { detail: opt }));
-    } catch {}
+    } catch { }
   };
 
   // Sync option from external sources (e.g., Start form)
   useEffect(() => {
     const onOpt = (e) => {
       const opt = e?.detail;
-      if (opt && ["123","12","1"].includes(opt)) {
+      if (opt && ["123", "12", "1"].includes(opt)) {
         setActiveOpt(opt);
-        try { sessionStorage.setItem("sb_selected_option", opt); } catch {}
+        try { sessionStorage.setItem("sb_selected_option", opt); } catch { }
       }
     };
-    try { window.addEventListener("sb:option-changed", onOpt); } catch {}
-    return () => { try { window.removeEventListener("sb:option-changed", onOpt); } catch {} };
+    try { window.addEventListener("sb:option-changed", onOpt); } catch { }
+    return () => { try { window.removeEventListener("sb:option-changed", onOpt); } catch { } };
   }, []);
 
   // ---------- Render ----------
@@ -368,7 +368,7 @@ export default function LiveSimulator() {
             <div className="card-header header-current"><span>AKTUELL</span></div>
             <div className="card-body">
               <img className="star-icon" style={{ width: "100%", maxWidth: 48 }}
-                   src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/689f5709ae0db7541734c589_red-cross.webp" alt="Sterne" />
+                src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/689f5709ae0db7541734c589_red-cross.webp" alt="Sterne" />
               <div className="before-after-text">
                 <h2 className="rating-value" style={{ margin: 0 }}>{fmt1(avg)} ⭐</h2>
                 <p className="review-count" style={{ margin: 0 }}>{total.toLocaleString()} Bewertungen</p>
@@ -385,7 +385,7 @@ export default function LiveSimulator() {
             <div className="card-header header-after"><span>NACH LÖSCHUNG</span></div>
             <div className="card-body">
               <img className="star-icon" style={{ width: "100%", maxWidth: 48 }}
-                   src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/689f5706192ab7698165e044_green-light.webp" alt="Sterne" />
+                src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/689f5706192ab7698165e044_green-light.webp" alt="Sterne" />
               <div className="before-after-text">
                 <h2 className="rating-value shake" style={{ margin: 0 }}>⚡ ⭐ {fmt1(newAvg)}</h2>
                 <p className="review-count" style={{ margin: 0 }}>{newTotal.toLocaleString()} Bewertungen</p>
@@ -480,7 +480,6 @@ export default function LiveSimulator() {
         <h3 className="section-title">
           <img
             className="search-icon"
-            style={{ marginTop: "-14px" }}
             src="https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/68a00396345c18200df4a5b3_%F0%9F%94%8D.webp"
             alt="search-icon"
           />
@@ -535,6 +534,7 @@ export default function LiveSimulator() {
 
         .review-container{font-family:'Poppins',sans-serif;max-width:1207px;margin:auto;padding:80px 10px;border-radius:16px;background:url("https://cdn.prod.website-files.com/6899bdb7664b4bd2cbd18c82/689acdb9f72cb41186204eda_stars-rating.webp") center/cover no-repeat}
         .section-title{max-width:975px;font-family:'Outfit',sans-serif;color:#010101;font-weight:400!important;margin:0 auto;font-size:48px;line-height:120%;text-align:center}
+        .search-icon{display:inline-block;vertical-align:middle;margin-right:12px;width:48px;height:auto;margin-top:-8px}
         .review-card{max-width:755px;margin:40px auto 0;padding:40px;border-radius:8px;background:#fff}
 
         /* Eingabefeld zentrieren + Breite kontrollieren */
