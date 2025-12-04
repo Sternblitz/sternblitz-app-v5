@@ -21,11 +21,11 @@ import {
     useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, MoreHorizontal, Settings, Trash2, Edit2, Phone, MapPin, User, Search } from "lucide-react";
+import { Plus, MoreHorizontal, Settings, Trash2, Edit2, Phone, MapPin, User, Search, Bookmark } from "lucide-react";
 
 // --- Components ---
 
-function SortableColumn({ column, candidates, onAddCandidate, onEditColumn, onCandidateClick, isEditMode }) {
+function SortableColumn({ column, candidates, onAddCandidate, onEditColumn, onCandidateClick, isEditMode, onDeleteCandidate, onToggleMarkCandidate }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: column.id,
         data: { type: "Column", column },
@@ -69,7 +69,13 @@ function SortableColumn({ column, candidates, onAddCandidate, onEditColumn, onCa
                 <SortableContext items={candidates.map(c => c.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-2">
                         {candidates.map(c => (
-                            <SortableCandidate key={c.id} candidate={c} onClick={() => onCandidateClick(c)} />
+                            <SortableCandidate
+                                key={c.id}
+                                candidate={c}
+                                onClick={() => onCandidateClick(c)}
+                                onDelete={onDeleteCandidate}
+                                onToggleMark={onToggleMarkCandidate}
+                            />
                         ))}
                     </div>
                 </SortableContext>
@@ -86,7 +92,7 @@ function SortableColumn({ column, candidates, onAddCandidate, onEditColumn, onCa
     );
 }
 
-function SortableCandidate({ candidate, onClick }) {
+function SortableCandidate({ candidate, onClick, onDelete, onToggleMark }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: candidate.id,
         data: { type: "Candidate", candidate }
@@ -114,8 +120,25 @@ function SortableCandidate({ candidate, onClick }) {
             {...attributes}
             {...listeners}
             onClick={onClick}
-            className="bg-white p-3 rounded-lg shadow-sm border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer active:cursor-grabbing group"
+            className={`bg-white p-3 rounded-lg shadow-sm border transition-all cursor-pointer active:cursor-grabbing group relative ${candidate.is_marked ? 'border-blue-500 ring-1 ring-blue-500' : 'border-slate-200 hover:border-blue-300 hover:shadow-md'}`}
         >
+            {/* Actions (visible on hover) */}
+            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onToggleMark(candidate); }}
+                    className={`p-1 rounded hover:bg-slate-100 ${candidate.is_marked ? 'text-blue-600' : 'text-slate-400'}`}
+                    title="Markieren"
+                >
+                    <Bookmark size={14} />
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(candidate.id); }}
+                    className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                    title="Löschen"
+                >
+                    <Trash2 size={14} />
+                </button>
+            </div>
             <div className="flex justify-between items-start mb-1">
                 <h4 className="font-bold text-slate-800 text-sm">{candidate.name}</h4>
                 <Edit2 size={12} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -386,6 +409,26 @@ export default function RecruitingPage() {
         setColModalOpen(false);
     };
 
+    const handleDeleteCandidate = async (id) => {
+        if (!confirm("Kandidat wirklich löschen?")) return;
+        const { error } = await supabase().from("recruiting_candidates").delete().eq("id", id);
+        if (!error) {
+            setCandidates(prev => prev.filter(c => c.id !== id));
+        }
+    };
+
+    const handleToggleMarkCandidate = async (candidate) => {
+        const newVal = !candidate.is_marked;
+        // Optimistic update
+        setCandidates(prev => prev.map(c => c.id === candidate.id ? { ...c, is_marked: newVal } : c));
+
+        const { error } = await supabase().from("recruiting_candidates").update({ is_marked: newVal }).eq("id", candidate.id);
+        if (error) {
+            // Revert if error
+            setCandidates(prev => prev.map(c => c.id === candidate.id ? { ...c, is_marked: !newVal } : c));
+        }
+    };
+
     // Drag Handlers
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
@@ -514,6 +557,8 @@ export default function RecruitingPage() {
                                     onAddCandidate={() => openAddCand(col.id)}
                                     onEditColumn={() => openEditCol(col)}
                                     onCandidateClick={(cand) => openEditCand(cand)}
+                                    onDeleteCandidate={handleDeleteCandidate}
+                                    onToggleMarkCandidate={handleToggleMarkCandidate}
                                 />
                             ))}
                         </SortableContext>
