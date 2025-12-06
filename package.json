@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=20"
   },
   "scripts": {
     "dev": "next dev",
@@ -23,19 +23,12 @@
     "lucide-react": "^0.555.0",
     "next": "^16.0.7",
     "pdf-lib": "1.17.1",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-joyride": "^2.9.3",
     "recharts": "^3.5.1",
     "resend": "3.2.0",
     "stripe": "^16.0.0"
-  },
-  "optionalDependencies": {
-    "@next/swc-darwin-arm64": "14.2.3",
-    "@next/swc-darwin-x64": "14.2.3",
-    "@next/swc-linux-arm64-gnu": "14.2.3",
-    "@next/swc-linux-x64-gnu": "14.2.3",
-    "@next/swc-win32-x64-msvc": "14.2.3"
   },
   "devDependencies": {
     "@types/react": "19.2.2",
