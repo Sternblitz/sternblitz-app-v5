@@ -316,13 +316,13 @@ export default function TeamPage() {
 
         // Update local state immediately
         setOrders(prev => prev.map(o =>
-            openDealIds.includes(o.id) ? { ...o, commission_status: 'PAID' } : o
+            openDealIds.includes(o.id) ? { ...o, commission_status: 'PAID', status: 'COMMISSION_PAID' } : o
         ));
 
         // Background update
         const { error } = await supabase()
             .from("orders")
-            .update({ commission_status: 'PAID' })
+            .update({ commission_status: 'PAID', status: 'COMMISSION_PAID' })
             .in("id", openDealIds);
 
         if (error) {
@@ -334,15 +334,16 @@ export default function TeamPage() {
 
     const handleToggleCommission = async (deal) => {
         const newStatus = deal.commission_status === 'PAID' ? 'OPEN' : 'PAID';
+        const newOrderStatus = newStatus === 'PAID' ? 'COMMISSION_PAID' : 'PAID_DELETED'; // Revert to PAID_DELETED if unpaid
 
         // Optimistic Update
         setOrders(prev => prev.map(o =>
-            o.id === deal.id ? { ...o, commission_status: newStatus } : o
+            o.id === deal.id ? { ...o, commission_status: newStatus, status: newOrderStatus } : o
         ));
 
         const { error } = await supabase()
             .from("orders")
-            .update({ commission_status: newStatus })
+            .update({ commission_status: newStatus, status: newOrderStatus })
             .eq("id", deal.id);
 
         if (error) {

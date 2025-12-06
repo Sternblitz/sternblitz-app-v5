@@ -88,19 +88,26 @@ export default function OrdersPage() {
   const formatEUR = (value) => (Number.isFinite(Number(value)) ? currencyFormatter.format(Number(value)) : "—");
   const STATUS_OPTIONS = [
     { value: "NEW", label: "Neu" },
-    { value: "PROCESSING", label: "Löschung in Bearbeitung" },
-    { value: "SUCCESS", label: "Löschung Erfolgreich" },
-    { value: "WAITING_PAYMENT", label: "Warte auf Zahlung" },
+    { value: "PROCESSING", label: "Löschung in Bearbeitung ⏳" },
+    { value: "WAITING_PAYMENT", label: "Erfolgreich gelöscht, warte auf Zahlung 💸" },
+    { value: "PAID_DELETED", label: "Bezahlt, warte auf Provision 🤑" },
+    { value: "COMMISSION_PAID", label: "Provision ausbezahlt 💰" },
   ];
   const STATUS_LABELS = STATUS_OPTIONS.reduce((acc, it) => { acc[it.value] = it.label; return acc; }, {});
   const normalizeStatus = (raw) => {
     if (!raw) return "NEW";
+    // Check for exact matches first (case-insensitive)
+    const upper = String(raw).toUpperCase();
+    if (STATUS_OPTIONS.some(opt => opt.value === upper)) return upper;
+
+    // Fallback fuzzy matching for legacy/german values
     const s = String(raw).toLowerCase();
-    if (raw === "NEW" || raw === "PROCESSING" || raw === "SUCCESS" || raw === "WAITING_PAYMENT") return raw;
     if (s.includes("bearbeit")) return "PROCESSING";
-    if (s.includes("erfolg")) return "SUCCESS";
-    if (s.includes("zahl")) return "WAITING_PAYMENT";
-    if (s.includes("neu") || s === "new") return "NEW";
+    if (s.includes("erfolg") || s.includes("success")) return "WAITING_PAYMENT";
+    if (s.includes("zahl") || s.includes("wait")) return "WAITING_PAYMENT";
+    if (s.includes("bezahlt") || s.includes("paid")) return "PAID_DELETED";
+    if (s.includes("provision") || s.includes("commission")) return "COMMISSION_PAID";
+
     return "NEW";
   };
 
@@ -353,6 +360,10 @@ export default function OrdersPage() {
     switch (code) {
       case "SUCCESS":
         return "tag-done";
+      case "PAID_DELETED":
+        return "tag-done";
+      case "COMMISSION_PAID":
+        return "tag-done";
       case "WAITING_PAYMENT":
         return "tag-wait";
       case "PROCESSING":
@@ -432,7 +443,7 @@ export default function OrdersPage() {
       sales: (row?.sales_notes ?? row?.custom_notes ?? ""),
       admin: (row?.backoffice_notes ?? ((row?.counts && typeof row.counts === "object" && row.counts._admin_notes) ? String(row.counts._admin_notes) : "")),
     };
-    const canEditSales = me?.role === "ADMIN" || me?.role === "TEAM_LEADER" || me?.role === "SALES";
+    const canEditSales = me?.role === "ADMIN" || me?.role === "TEAM_LEADER" || me?.role === "SALES" || me?.role === "MANAGER";
     const canEditAdmin = me?.role === "ADMIN";
     const setDraft = (patch) => setNotesDraft((prev) => ({ ...prev, [row.id]: { ...draft, ...patch } }));
     const saveNotes = async () => {
@@ -503,7 +514,7 @@ export default function OrdersPage() {
         <div className="summary">
           <div className="summary-main">
             <div className="summary-info">
-              {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN") && (
+              {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN" || me?.role === "MANAGER") && (
                 <div className="rep-title">{repName || "Unbekannter Vertriebler"}</div>
               )}
               <div className="summary-headline">
@@ -701,6 +712,7 @@ export default function OrdersPage() {
                   {row?.pdf_path ? (
                     <span className="hint">Storage: {row.pdf_path}</span>
                   ) : null}
+
                   {!pmOnFile ? (
                     <>
                       <a className="cta-link" href={`/sign/payment?order=${row.id}`} target="_blank" rel="noreferrer">Zahlungsart hinzufügen ↗</a>
@@ -856,7 +868,7 @@ export default function OrdersPage() {
           .mini-btn:hover { transform: translateY(-1px); box-shadow:0 2px 10px rgba(0,0,0,.06); }
           .mini-btn.blue { border-color:#0b6cf2; color:#0b6cf2; background:#f0f6ff; }
           .mini-btn.primary { border-color:#0b6cf2; background:#0b6cf2; color:#fff }
-          .status-select { height: 34px; border-radius: 10px; border: 1px solid #e5e7eb; background:#fff; padding: 0 8px; font-weight: 700; font-size: 13px; }
+          .status-select { height: 34px; padding: 0 8px; font-weight: 700; font-size: 13px; }
           .summary-stats { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
           .stat { background:#f8fafc; border:1px solid #eef2f7; border-radius: 14px; padding: 12px; }
           .stat .label { font-size: 12px; color:#64748b; }
@@ -933,29 +945,33 @@ export default function OrdersPage() {
           <p className="sub">{greetingSub}</p>
         </div>
         <div className="actions">
-          {me?.role === "ADMIN" && (
+          {(me?.role === "ADMIN" || me?.role === "MANAGER") && (
             <>
-              <button type="button" className="action-btn" onClick={() => router.push("/admin/crm")}>
+              <button type="button" className="action-btn" onClick={() => router.push("/admin/crm/deals")}>
                 CRM 👑
               </button>
-              <button type="button" className="action-btn" onClick={() => router.push("/dashboard/team")}>
-                Invite 👥
-              </button>
-              <button
-                type="button"
-                className="action-btn"
-                onClick={() => {
-                  const amount = prompt("Rabatt in € eingeben (z.B. 50):");
-                  if (!amount) return;
-                  const val = parseFloat(amount.replace(",", "."));
-                  if (val > 0) {
-                    sessionStorage.setItem("sb_custom_discount", Math.round(val * 100));
-                    router.push("/dashboard");
-                  }
-                }}
-              >
-                Rabatt 🏷️
-              </button>
+              {me?.role === "ADMIN" && (
+                <button type="button" className="action-btn" onClick={() => router.push("/dashboard/team")}>
+                  Invite 👥
+                </button>
+              )}
+              {me?.role === "ADMIN" && (
+                <button
+                  type="button"
+                  className="action-btn"
+                  onClick={() => {
+                    const amount = prompt("Rabatt in € eingeben (z.B. 50):");
+                    if (!amount) return;
+                    const val = parseFloat(amount.replace(",", "."));
+                    if (val > 0) {
+                      sessionStorage.setItem("sb_custom_discount", Math.round(val * 100));
+                      router.push("/dashboard");
+                    }
+                  }}
+                >
+                  Rabatt 🏷️
+                </button>
+              )}
             </>
           )}
           <button type="button" className="action-btn" onClick={() => router.push("/dashboard")}>
@@ -992,64 +1008,32 @@ export default function OrdersPage() {
             </button>
           ))}
         </div>
-
         <div className="filters">
           {(me?.role === "ADMIN") && (
-            <div className="mode">
-              <label>Rangliste</label>
-              <div className="seg-wrap">
-                <button type="button" className={`seg ${boardMode === "reps" ? "on" : ""}`} onClick={() => setBoardMode("reps")}>Vertriebler</button>
-                <button type="button" className={`seg ${boardMode === "teams" ? "on" : ""}`} onClick={() => setBoardMode("teams")}>Teams</button>
-              </div>
-            </div>
+            <button
+              type="button"
+              className={`chip ${promoOnly ? 'on' : ''}`}
+              onClick={() => setPromoOnly((v) => !v)}
+              title="Nur Aufträge mit Promo/Rabatt zeigen"
+            >
+              🎉 Nur Promo
+            </button>
           )}
-          <div className="date">
-            <label>📅 Datum</label>
+
+          <div className="date" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#64748b' }}>📅 Datum</span>
             <input
               type="date"
+              className="chip"
+              style={{ padding: '0 10px', height: '32px', border: '1px solid #e5e7eb', borderRadius: '999px', fontFamily: 'inherit', fontWeight: '600', color: '#334155' }}
               value={dayFilter || ""}
               onChange={(e) => setDayFilter(e.target.value || null)}
             />
             {dayFilter ? (
-              <button className="chip" onClick={() => setDayFilter(null)}>Zurücksetzen ✖</button>
+              <button className="chip" onClick={() => setDayFilter(null)}>✖</button>
             ) : null}
           </div>
-          {(me?.role === "ADMIN") && (
-            <div className="teams">
-              <label>👥 Teams</label>
-              <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
-                <option value="all">Alle</option>
-                {Object.entries(teamMap).sort((a, b) => a[1].localeCompare(b[1], 'de')).map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN") && (
-            <div className="reps">
-              <label>🧑‍💼 Vertriebler</label>
-              <select value={repFilter} onChange={(e) => setRepFilter(e.target.value)}>
-                <option value="all">Alle</option>
-                {Array.from(new Set((rows || []).map(r => r?.created_by).filter(Boolean)))
-                  .map((id) => {
-                    const name = (repMap?.[id]?.full_name) || (rows.find(rr => rr.created_by === id)?.rep_code) || id;
-                    return { id, name };
-                  })
-                  .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-                  .map(({ id, name }) => (
-                    <option key={id} value={id}>{name}</option>
-                  ))}
-              </select>
-            </div>
-          )}
-          <button
-            type="button"
-            className={`chip ${promoOnly ? 'on' : ''}`}
-            onClick={() => setPromoOnly((v) => !v)}
-            title="Nur Aufträge mit Promo/Rabatt zeigen"
-          >
-            🎉 Nur Promo
-          </button>
+
           <div className="search">
             <input
               type="search"
@@ -1060,6 +1044,46 @@ export default function OrdersPage() {
           </div>
         </div>
       </section>
+      <div className="filters">
+        {(me?.role === "ADMIN") && (
+          <div className="mode">
+            <label>Rangliste</label>
+            <div className="seg-wrap">
+              <button type="button" className={`seg ${boardMode === "reps" ? "on" : ""}`} onClick={() => setBoardMode("reps")}>Vertriebler</button>
+              <button type="button" className={`seg ${boardMode === "teams" ? "on" : ""}`} onClick={() => setBoardMode("teams")}>Teams</button>
+            </div>
+          </div>
+        )}
+
+        {(me?.role === "ADMIN") && (
+          <div className="teams">
+            <label>👥 Teams</label>
+            <select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)}>
+              <option value="all">Alle</option>
+              {Object.entries(teamMap).sort((a, b) => a[1].localeCompare(b[1], 'de')).map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN") && (
+          <div className="reps">
+            <label>🧑‍💼 Vertriebler</label>
+            <select value={repFilter} onChange={(e) => setRepFilter(e.target.value)}>
+              <option value="all">Alle</option>
+              {Array.from(new Set((rows || []).map(r => r?.created_by).filter(Boolean)))
+                .map((id) => {
+                  const name = (repMap?.[id]?.full_name) || (rows.find(rr => rr.created_by === id)?.rep_code) || id;
+                  return { id, name };
+                })
+                .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+                .map(({ id, name }) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       <section className="list tour-orders-list">
         {(me?.role === "TEAM_LEADER" || me?.role === "ADMIN") ? (
@@ -1168,7 +1192,7 @@ export default function OrdersPage() {
           .span2 { grid-column: auto; }
         }
       `}</style>
-    </main>
+    </main >
   );
 }
 
@@ -1178,6 +1202,8 @@ function StatusControl({ value, onChange, disabled }) {
     { value: "PROCESSING", label: "Löschung in Bearbeitung" },
     { value: "SUCCESS", label: "Löschung Erfolgreich" },
     { value: "WAITING_PAYMENT", label: "Warte auf Zahlung" },
+    { value: "PAID_DELETED", label: "Bezahlt -> Prov. fällig" },
+    { value: "COMMISSION_PAID", label: "Provision ausbezahlt 💰" },
   ];
   return (
     <>

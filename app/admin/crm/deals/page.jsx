@@ -46,6 +46,17 @@ const COLUMNS = {
     DONE: { title: "💰 DONE (Prov. fällig)", color: "border-purple-500" }
 };
 
+const STATUS_LABELS = {
+    NEW: "Neu",
+    PROCESSING: "Löschung in Bearbeitung ⏳",
+    SUCCESS: "Erfolgreich gelöscht, warte auf Zahlung 💸",
+    WAITING_PAYMENT: "Erfolgreich gelöscht, warte auf Zahlung 💸",
+    PAID_DELETED: "Bezahlt, warte auf Provision 🤑",
+    COMMISSION_PAID: "Provision ausbezahlt 💰"
+};
+
+
+
 const COLUMN_IDS = ["INBOX", "PROCESSING", "SUCCESS_OPEN", "DONE"];
 
 // --- Helper Components ---
@@ -294,7 +305,7 @@ function DealDetailsDrawer({ deal, onClose, onUpdate }) {
                                 {COLUMNS[deal.admin_stage]?.title || deal.admin_stage}
                             </span>
                             <span className="px-3 py-1 rounded-full text-xs font-bold bg-white border border-slate-200 text-slate-500">
-                                {deal.status}
+                                {STATUS_LABELS[deal.status] || deal.status}
                             </span>
                         </div>
                     </div>
@@ -423,6 +434,19 @@ export default function KanbanPage() {
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    const [isManager, setIsManager] = useState(false);
+
+    useEffect(() => {
+        const checkRole = async () => {
+            const { data: { user } } = await supabase().auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase().from("profiles").select("role").eq("user_id", user.id).single();
+                if (profile?.role === "MANAGER") setIsManager(true);
+            }
+        };
+        checkRole();
+    }, []);
+
     // ... (fetchDeals remains same) ...
     const fetchDeals = async () => {
         setLoading(true);
@@ -501,6 +525,7 @@ export default function KanbanPage() {
     }, [deals, searchTerm]);
 
     const handleDragStart = (event) => {
+        if (isManager) return; // Disable drag for Manager
         setActiveId(event.active.id);
     };
 
@@ -509,6 +534,7 @@ export default function KanbanPage() {
     };
 
     const handleDragEnd = async (event) => {
+        if (isManager) return; // Disable drag for Manager
         const { active, over } = event;
         setActiveId(null);
 
@@ -531,14 +557,22 @@ export default function KanbanPage() {
 
         let updates = { admin_stage: targetContainer };
 
-        // Auto-update Payment Status based on Column
+        // Auto-update Payment Status & Order Status based on Column
         if (targetContainer === 'DONE') {
             updates.payment_status = 'paid';
-        } else if (currentContainer === 'DONE' && targetContainer !== 'DONE') {
-            // If moving OUT of DONE, revert payment status (unless we want to keep it paid?)
-            // Let's revert to 'open' to be safe, assuming 'DONE' implies 'Paid'
+            updates.status = 'PAID_DELETED';
+        } else if (targetContainer === 'SUCCESS_OPEN') {
+            updates.status = 'WAITING_PAYMENT';
+        } else if (targetContainer === 'PROCESSING') {
+            updates.status = 'PROCESSING';
+        } else if (targetContainer === 'INBOX') {
+            updates.status = 'NEW';
+        }
+
+        if (currentContainer === 'DONE' && targetContainer !== 'DONE') {
+            // If moving OUT of DONE, revert payment status
             updates.payment_status = 'open';
-            updates.commission_status = 'OPEN'; // Also revert commission if moving back
+            updates.commission_status = 'OPEN';
         }
 
         setDeals(prev => prev.map(d => d.id === dealId ? { ...d, ...updates } : d));
@@ -551,20 +585,22 @@ export default function KanbanPage() {
     };
 
     const handlePayCommission = async (dealId) => {
+        if (isManager) return; // Disable for Manager
         // Optimistic Update
-        setDeals(prev => prev.map(d => d.id === dealId ? { ...d, commission_status: 'PAID' } : d));
+        setDeals(prev => prev.map(d => d.id === dealId ? { ...d, commission_status: 'PAID', status: 'COMMISSION_PAID' } : d));
 
-        const { error } = await supabase().from("orders").update({ commission_status: 'PAID' }).eq("id", dealId);
+        const { error } = await supabase().from("orders").update({ commission_status: 'PAID', status: 'COMMISSION_PAID' }).eq("id", dealId);
 
         if (error) {
             console.error("Error paying commission:", error);
             // Revert on error
-            setDeals(prev => prev.map(d => d.id === dealId ? { ...d, commission_status: 'OPEN' } : d));
+            setDeals(prev => prev.map(d => d.id === dealId ? { ...d, commission_status: 'OPEN', status: 'PAID_DELETED' } : d));
             // Ideally show a toast here, but for now console error is better than alert
         }
     };
 
     const handleCreateDeal = async () => {
+        if (isManager) return; // Disable for Manager
         if (!newDeal.company) return alert("Firmenname fehlt");
         setCreating(true);
 
@@ -613,6 +649,52 @@ export default function KanbanPage() {
         setCreating(false);
     };
 
+    const [refreshingAll, setRefreshingAll] = useState(false);
+    const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
+
+    const handleRefreshAll = async () => {
+        if (refreshingAll) return;
+
+        // Filter deals: Only INBOX or PROCESSING
+        const dealsToRefresh = deals.filter(d => {
+            const stage = d.admin_stage || 'INBOX';
+            return stage === 'INBOX' || stage === 'PROCESSING';
+        });
+
+        if (dealsToRefresh.length === 0) {
+            alert("Keine Deals in 'Eingang' oder 'In Arbeit' gefunden.");
+            return;
+        }
+
+        if (!confirm(`${dealsToRefresh.length} Deals aktualisieren? (Nur Eingang & In Arbeit)`)) return;
+
+        setRefreshingAll(true);
+        const total = dealsToRefresh.length;
+        setRefreshProgress({ current: 0, total });
+
+        let successCount = 0;
+
+        for (let i = 0; i < total; i++) {
+            const deal = dealsToRefresh[i];
+            setRefreshProgress({ current: i + 1, total });
+            try {
+                const res = await fetch(`/api/orders/${deal.id}/refresh`, { method: "POST" });
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json?.row) {
+                        setDeals(prev => prev.map(d => d.id === deal.id ? { ...d, ...json.row } : d));
+                    }
+                    successCount++;
+                }
+            } catch (e) {
+                console.error(`Failed to refresh deal ${deal.id}`, e);
+            }
+        }
+
+        setRefreshingAll(false);
+        alert(`Erfolgreich aktualisiert! (${successCount}/${total} Deals)`);
+    };
+
     const activeDeal = activeId ? deals.find(d => d.id === activeId) : null;
 
     return (
@@ -620,7 +702,7 @@ export default function KanbanPage() {
             <header className="flex justify-between items-center mb-6 px-2">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Deals Board</h1>
-                    <p className="text-slate-500 text-sm">Drag & Drop Management • Admin Only View</p>
+                    <p className="text-slate-500 text-sm">Drag & Drop Management • {isManager ? "Read Only" : "Admin Only View"}</p>
                 </div>
                 <div className="flex gap-3">
                     <div className="relative">
@@ -633,13 +715,25 @@ export default function KanbanPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+
                     <button
-                        onClick={() => setShowAddModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                        onClick={handleRefreshAll}
+                        disabled={refreshingAll}
+                        className={`flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors shadow-sm ${refreshingAll ? "opacity-70 cursor-not-allowed" : ""}`}
                     >
-                        <Plus size={18} />
-                        Deal
+                        <RefreshCw size={18} className={refreshingAll ? "animate-spin" : ""} />
+                        {refreshingAll ? `${refreshProgress.current}/${refreshProgress.total}` : "Alle aktualisieren"}
                     </button>
+
+                    {!isManager && (
+                        <button
+                            onClick={() => setShowAddModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200"
+                        >
+                            <Plus size={18} />
+                            Deal
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -659,7 +753,7 @@ export default function KanbanPage() {
                             color={COLUMNS[colId].color}
                             deals={columns[colId]}
                             count={columns[colId].length}
-                            onPayCommission={handlePayCommission}
+                            onPayCommission={isManager ? undefined : handlePayCommission}
                             onDealClick={setSelectedDeal}
                         />
                     ))}

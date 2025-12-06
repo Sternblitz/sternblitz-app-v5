@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED = new Set(["NEW", "PROCESSING", "SUCCESS", "WAITING_PAYMENT"]);
+const ALLOWED = new Set(["NEW", "PROCESSING", "SUCCESS", "WAITING_PAYMENT", "PAID_DELETED", "COMMISSION_PAID"]);
 
 function normalizeStatus(raw) {
   if (!raw) return null;
@@ -15,6 +15,8 @@ function normalizeStatus(raw) {
   if (s.includes("bearbeit")) return "PROCESSING";
   if (s.includes("erfolg") || s.includes("success")) return "SUCCESS";
   if (s.includes("zahl") || s.includes("wait")) return "WAITING_PAYMENT";
+  if (s.includes("bezahlt") && s.includes("gelöscht")) return "PAID_DELETED";
+  if (s.includes("provision") && s.includes("ausbezahlt")) return "COMMISSION_PAID";
   return null;
 }
 

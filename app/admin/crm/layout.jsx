@@ -22,6 +22,8 @@ export default function AdminCrmLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  const [role, setRole] = useState(null);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -41,8 +43,9 @@ export default function AdminCrmLayout({ children }) {
         .single();
 
       if (mounted) {
-        if (profile?.role === "ADMIN") {
+        if (profile?.role === "ADMIN" || profile?.role === "MANAGER") {
           setAuthorized(true);
+          setRole(profile.role);
         } else {
           router.replace("/dashboard");
         }
@@ -60,12 +63,14 @@ export default function AdminCrmLayout({ children }) {
 
   if (!authorized) return null;
 
-  const navItems = [
-    { label: "Dashboard", href: "/admin/crm", icon: LayoutDashboard, exact: true },
-    { label: "Deals & Pipeline", href: "/admin/crm/deals", icon: Briefcase },
-    { label: "Team & HR", href: "/admin/crm/team", icon: Users },
-    { label: "Recruiting", href: "/admin/crm/recruiting", icon: Zap },
+  const allNavItems = [
+    { label: "Dashboard", href: "/admin/crm", icon: LayoutDashboard, exact: true, roles: ["ADMIN"] },
+    { label: "Deals & Pipeline", href: "/admin/crm/deals", icon: Briefcase, roles: ["ADMIN", "MANAGER"] },
+    { label: "Team & HR", href: "/admin/crm/team", icon: Users, roles: ["ADMIN"] },
+    { label: "Recruiting", href: "/admin/crm/recruiting", icon: Zap, roles: ["ADMIN"] },
   ];
+
+  const navItems = allNavItems.filter(item => item.roles.includes(role));
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc] font-sans text-slate-900">
