@@ -28,7 +28,7 @@ function pickSafePayload(input = {}) {
 
 export async function POST(req) {
   try {
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user || null;
 

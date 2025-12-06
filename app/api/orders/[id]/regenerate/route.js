@@ -27,10 +27,10 @@ function labelFor(opt) {
   return opt === "123"
     ? "1–3 Sterne löschen"
     : opt === "12"
-    ? "1–2 Sterne löschen"
-    : opt === "1"
-    ? "1 Stern löschen"
-    : "Individuelle Löschungen";
+      ? "1–2 Sterne löschen"
+      : opt === "1"
+        ? "1 Stern löschen"
+        : "Individuelle Löschungen";
 }
 
 function chosenCount(selectedOption, counts) {
@@ -130,7 +130,7 @@ export async function POST(req, { params }) {
     if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
 
     // require logged-in internal user
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr) return NextResponse.json({ error: userErr.message }, { status: 401 });
     if (!userData?.user) return NextResponse.json({ error: "Nicht eingeloggt" }, { status: 401 });
@@ -188,7 +188,7 @@ export async function POST(req, { params }) {
           });
           sent = true;
         }
-      } catch {}
+      } catch { }
     }
 
     return NextResponse.json({ ok: true, pdfUrl, pdfPath: key, emailed: sent });

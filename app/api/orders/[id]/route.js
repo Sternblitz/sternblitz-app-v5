@@ -10,7 +10,7 @@ export async function DELETE(_req, { params }) {
     const id = params?.id;
     if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
 
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) return NextResponse.json({ error: userError.message }, { status: 401 });
     if (!user) return NextResponse.json({ error: "Nicht eingeloggt." }, { status: 401 });

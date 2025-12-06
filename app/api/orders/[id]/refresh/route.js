@@ -73,7 +73,7 @@ export async function POST(_req, { params }) {
       return NextResponse.json({ error: "Order-ID fehlt." }, { status: 400 });
     }
 
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
 
     const { data: order, error: orderError } = await supabase
       .from("orders")

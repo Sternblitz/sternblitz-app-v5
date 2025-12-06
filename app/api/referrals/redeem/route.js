@@ -10,10 +10,10 @@ export async function POST(req) {
   try {
     // Interne Nutzer (eingeloggt) dürfen keine Promo einlösen
     try {
-      const supabase = supabaseServerAuth();
+      const supabase = await supabaseServerAuth();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) return NextResponse.json({ error: "Promo-Code ist für interne Accounts deaktiviert." }, { status: 403 });
-    } catch {}
+    } catch { }
     const { order_id, code, email } = await req.json().catch(() => ({}));
     if (!order_id || !code) return NextResponse.json({ error: "order_id und code erforderlich" }, { status: 400 });
     const c = (code || "").toString().trim().toUpperCase();
@@ -53,7 +53,7 @@ export async function POST(req) {
           .from("referral_codes")
           .update({ uses_count: (rc?.uses_count || 0) + 1 })
           .eq("code", rc.code);
-      } catch {}
+      } catch { }
     }
     return NextResponse.json({ ok: true, order: updated });
   } catch (e) {

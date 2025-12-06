@@ -11,10 +11,10 @@ function labelFor(opt) {
   return opt === "123"
     ? "1–3 Sterne löschen"
     : opt === "12"
-    ? "1–2 Sterne löschen"
-    : opt === "1"
-    ? "1 Stern löschen"
-    : "Individuelle Löschungen";
+      ? "1–2 Sterne löschen"
+      : opt === "1"
+        ? "1 Stern löschen"
+        : "Individuelle Löschungen";
 }
 
 function referralBase(firstName = "", lastName = "") {
@@ -36,7 +36,7 @@ async function ensureReferralCode(admin, orderId, firstName, lastName) {
       .eq("referrer_order_id", orderId)
       .maybeSingle();
     if (existing?.code) return existing.code;
-  } catch {}
+  } catch { }
   const candidate = referralBase(firstName, lastName);
   try {
     const { data } = await admin
@@ -45,7 +45,7 @@ async function ensureReferralCode(admin, orderId, firstName, lastName) {
       .select("code")
       .maybeSingle();
     if (data?.code) return data.code;
-  } catch {}
+  } catch { }
   return candidate;
 }
 
@@ -57,7 +57,7 @@ export async function POST(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const toOverride = (body?.to || body?.email || "").trim();
 
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr) return NextResponse.json({ error: userErr.message }, { status: 401 });
     if (!userData?.user) return NextResponse.json({ error: "Nicht eingeloggt" }, { status: 401 });
@@ -160,7 +160,7 @@ export async function POST(req, { params }) {
           const ab = await r.arrayBuffer();
           attachments.push({ filename: `Sternblitz_Auftragsbestaetigung_${order.first_name || 'Kunde'}.pdf`, content: Buffer.from(ab), contentType: 'application/pdf' });
         }
-      } catch {}
+      } catch { }
     }
     const AGB_URL = process.env.NEXT_PUBLIC_AGB_URL || process.env.AGB_URL || null;
     const PRIVACY_URL = process.env.NEXT_PUBLIC_PRIVACY_URL || process.env.PRIVACY_URL || null;
@@ -171,7 +171,7 @@ export async function POST(req, { params }) {
         if (!res.ok) return;
         const ab = await res.arrayBuffer();
         attachments.push({ filename: outName, content: Buffer.from(ab), contentType: 'application/pdf' });
-      } catch {}
+      } catch { }
     };
     await tryAttachFromUrl(AGB_URL, 'AGB.pdf');
     await tryAttachFromUrl(PRIVACY_URL, 'Datenschutzbestimmungen.pdf');

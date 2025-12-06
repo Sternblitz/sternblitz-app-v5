@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 
 export async function POST(req) {
   try {
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: userData, error: userErr } = await supabase.auth.getUser();
     if (userErr) return NextResponse.json({ error: userErr.message }, { status: 401 });
     if (!userData?.user) return NextResponse.json({ error: "Nicht eingeloggt" }, { status: 401 });

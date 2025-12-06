@@ -14,7 +14,7 @@ export async function POST(req, { params }) {
     if (!orderId) return NextResponse.json({ error: "orderId fehlt" }, { status: 400 });
 
     // auth: only ADMIN can charge
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: userData } = await supabase.auth.getUser();
     if (!userData?.user) return NextResponse.json({ error: "Nicht eingeloggt" }, { status: 401 });
     const { data: me, error: meErr } = await supabase
@@ -58,7 +58,7 @@ export async function POST(req, { params }) {
     try {
       const pm = await stripe.paymentMethods.retrieve(order.stripe_payment_method_id);
       if (pm?.type) methodType = pm.type;
-    } catch {}
+    } catch { }
     const normalizedType = methodType ? String(methodType).toLowerCase() : null;
     const chargeParams = {
       amount,
@@ -92,7 +92,7 @@ export async function POST(req, { params }) {
       try {
         const url = pi.charges?.data?.[0]?.receipt_url || null;
         if (url) update.payment_receipt_url = url;
-      } catch {}
+      } catch { }
     } else if (pi.status === "processing") {
       update.payment_status = "processing"; // SEPA, etc.
     }

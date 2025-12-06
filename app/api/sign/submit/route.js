@@ -227,7 +227,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Ungültige Daten" }, { status: 400 });
     }
 
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const user = userData?.user || null;
     if (userError) {

@@ -10,7 +10,7 @@ export async function POST(req, { params }) {
     const id = params?.id;
     if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
 
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const {
       data: { user },
       error: userError,

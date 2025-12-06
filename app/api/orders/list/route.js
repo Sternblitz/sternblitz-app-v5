@@ -5,14 +5,14 @@ import { supabaseServerAuth } from "@/lib/supabaseServerAuth";
 export const dynamic = "force-dynamic";
 
 // helpers
-function startOfToday() { const d = new Date(); d.setHours(0,0,0,0); return d; }
-function startOfYesterday() { const d = startOfToday(); d.setDate(d.getDate()-1); return d; }
-function startOfNDaysAgo(n){ const d = startOfToday(); d.setDate(d.getDate()-n); return d; }
+function startOfToday() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function startOfYesterday() { const d = startOfToday(); d.setDate(d.getDate() - 1); return d; }
+function startOfNDaysAgo(n) { const d = startOfToday(); d.setDate(d.getDate() - n); return d; }
 const toISO = (d) => new Date(d).toISOString();
 
 export async function GET(req) {
   try {
-    const supabase = supabaseServerAuth();
+    const supabase = await supabaseServerAuth();
     const {
       data: { user },
       error: userError,
@@ -47,7 +47,7 @@ export async function GET(req) {
     // timeframe
     let gte = null, lt = null;
     if (range === "today") {
-      gte = startOfToday(); lt = new Date(gte); lt.setDate(lt.getDate()+1);
+      gte = startOfToday(); lt = new Date(gte); lt.setDate(lt.getDate() + 1);
     } else if (range === "yesterday") {
       gte = startOfYesterday(); lt = startOfToday();
     } else if (range === "7d") {
@@ -124,12 +124,12 @@ export async function GET(req) {
 
     const rows = Array.isArray(data)
       ? data.map((row) => ({
-          ...row,
-          counts:
-            row?.counts && typeof row.counts === "object"
-              ? row.counts
-              : null,
-        }))
+        ...row,
+        counts:
+          row?.counts && typeof row.counts === "object"
+            ? row.counts
+            : null,
+      }))
       : [];
 
     return NextResponse.json({ ok: true, rows });
