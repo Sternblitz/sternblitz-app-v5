@@ -8,121 +8,11 @@ import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
-function toWinAnsi(text = "") {
-  let s = String(text);
-  s = s.replace(/[\u{1F300}-\u{1FAFF}\u{1F000}-\u{1F9FF}\u{2600}-\u{27BF}]/gu, "");
-  s = s
-    .replace(/\u2192/g, "->")
-    .replace(/\u2190/g, "<-")
-    .replace(/[\u2013\u2014]/g, "-")
-    .replace(/\u2022/g, "-")
-    .replace(/\u2026/g, "...")
-    .replace(/\u2011/g, "-")
-    .replace(/[\u00A0\u202F\u2007\u2009]/g, " ")
-    .replace(/[\u2605\u2728]/g, "*");
-  return s;
-}
 
-function labelFor(opt) {
-  return opt === "123"
-    ? "1–3 Sterne löschen"
-    : opt === "12"
-      ? "1–2 Sterne löschen"
-      : opt === "1"
-        ? "1 Stern löschen"
-        : "Individuelle Löschungen";
-}
 
-function chosenCount(selectedOption, counts) {
-  if (!counts) return null;
-  if (selectedOption === "123") return counts.c123 ?? null;
-  if (selectedOption === "12") return counts.c12 ?? null;
-  if (selectedOption === "1") return counts.c1 ?? null;
-  return null;
-}
+import { buildPdf } from "@/lib/pdfGenerator";
 
-async function buildPdf(order) {
-  const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595, 842]);
-  const { height } = page.getSize();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const draw = (txt, opts) => page.drawText(toWinAnsi(txt), opts);
-
-  const discountCents = Math.max(0, Number(order?.discount_cents || 0));
-  const finalCents = computeFinal(BASE_PRICE_CENTS, discountCents);
-  const pricePromoCode = order?.referral_code ? String(order.referral_code).toUpperCase() : null;
-  const priceLine =
-    discountCents > 0
-      ? `Fixpreis: ${formatEUR(BASE_PRICE_CENTS)} -> ${formatEUR(finalCents)}${pricePromoCode ? ` (Promo ${pricePromoCode})` : " (Promo aktiv)"}`
-      : `Fixpreis: ${formatEUR(BASE_PRICE_CENTS)} (einmalig)`;
-
-  let y = height - 70;
-  draw("Auftragsbestätigung Sternblitz", { x: 50, y, font: bold, size: 20, color: rgb(0, 0, 0) });
-  y -= 20;
-  draw(
-    "Hiermit bestätige ich den Auftrag zur Löschung meiner negativen Google-Bewertungen.",
-    { x: 50, y, font, size: 11, color: rgb(0, 0, 0) }
-  );
-  y -= 25;
-  for (const b of [priceLine, "Zahlung erst nach Löschung (von mind. 90 % der Bewertungen)", "Dauerhafte Entfernung"]) {
-    draw("• " + b, { x: 50, y, font, size: 11, color: rgb(0, 0, 0) });
-    y -= 16;
-  }
-  y -= 10;
-  draw("Zusammenfassung", { x: 50, y, font: bold, size: 12, color: rgb(0, 0, 0) });
-  y -= 16;
-
-  const lines = [
-    [
-      "Preis",
-      discountCents > 0
-        ? `${formatEUR(BASE_PRICE_CENTS)} -> ${formatEUR(finalCents)}${pricePromoCode ? ` (Promo ${pricePromoCode})` : ""}`
-        : `${formatEUR(BASE_PRICE_CENTS)} (einmalig)`,
-    ],
-    ...(pricePromoCode ? [["Promo‑Code", `angewendet: ${pricePromoCode}`]] : []),
-    ["Google-Profil", order?.google_profile || "—"],
-    ["Bewertungen", labelFor(order?.selected_option)],
-    ["Firma", order?.company || "—"],
-    ["Vorname", order?.first_name || "—"],
-    ["Nachname", order?.last_name || "—"],
-    ["E-Mail", order?.email || "—"],
-    ["Telefon", order?.phone || "—"],
-  ];
-  for (const [k, v] of lines) {
-    draw(`${k}:`, { x: 50, y, font: bold, size: 10, color: rgb(0, 0, 0) });
-    draw(String(v ?? "—"), { x: 180, y, font, size: 10, color: rgb(0, 0, 0) });
-    y -= 14;
-  }
-  const picked = chosenCount(order?.selected_option, order?.counts);
-  y -= 6;
-  draw("Gewählte Löschung:", { x: 50, y, font: bold, size: 10, color: rgb(0, 0, 0) });
-  draw(
-    `${labelFor(order?.selected_option)}${picked != null ? ` — Entfernte: ${Number(picked).toLocaleString("de-DE")}` : ""}`,
-    { x: 180, y, font, size: 10, color: rgb(0, 0, 0) }
-  );
-  y -= 14;
-
-  // Rechtlicher Hinweis (über der Unterschrift/Datum)
-  y -= 8;
-  draw("Rechtlicher Hinweis:", { x: 50, y, font: bold, size: 10, color: rgb(0, 0, 0) });
-  y -= 14;
-  draw(
-    "Mit meiner Unterschrift bestätige ich, die AGB und die Datenschutzerklärung gelesen und akzeptiert zu haben.",
-    { x: 50, y, font, size: 10, color: rgb(0, 0, 0) }
-  );
-  y -= 14;
-  draw(
-    "Hinweis: Beide Dokumente sind der Bestätigungs-E-Mail als AGB.pdf und Datenschutzbestimmungen.pdf angehängt.",
-    { x: 50, y, font, size: 10, color: rgb(0, 0, 0) }
-  );
-  y -= 12;
-
-  draw("Datum:", { x: 50, y, font: bold, size: 10, color: rgb(0, 0, 0) });
-  draw(new Date().toLocaleString("de-DE"), { x: 180, y, font, size: 10, color: rgb(0, 0, 0) });
-
-  return await pdf.save();
-}
+// ... (imports)
 
 export async function POST(req, { params }) {
   try {
@@ -141,6 +31,7 @@ export async function POST(req, { params }) {
       .from("orders")
       .select(
         `id, google_profile, selected_option, counts, company, first_name, last_name, email, phone,
+         street, zip, city,
          discount_cents, referral_code, rep_code, team_id, org_id`
       )
       .eq("id", id)
@@ -149,7 +40,27 @@ export async function POST(req, { params }) {
     if (!order) return NextResponse.json({ error: "Auftrag nicht gefunden" }, { status: 404 });
 
     // build PDF
-    const pdfBytes = await buildPdf(order);
+    const discountCents = Math.max(0, Number(order.discount_cents || 0));
+    const finalCents = computeFinal(BASE_PRICE_CENTS, discountCents);
+    const promoCode = order.referral_code ? String(order.referral_code).toUpperCase() : null;
+
+    const pdfBytes = await buildPdf(
+      {
+        googleProfile: order.google_profile,
+        selectedOption: order.selected_option,
+        company: order.company,
+        firstName: order.first_name,
+        lastName: order.last_name,
+        street: order.street,
+        zip: order.zip,
+        city: order.city,
+        email: order.email,
+        phone: order.phone,
+        counts: order.counts,
+      },
+      null, // No signature available in regenerate
+      { discountCents, finalCents, promoCode }
+    );
 
     // store to bucket
     const safe = String(order?.first_name || "kunde").trim().replace(/[^a-z0-9_-]+/gi, "_") || "kunde";
