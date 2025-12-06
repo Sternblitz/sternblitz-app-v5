@@ -13,7 +13,7 @@ function clean(s) {
 
 export async function POST(req, { params }) {
   try {
-    const orderId = params?.id;
+    const { id: orderId } = await params;
     if (!orderId) return NextResponse.json({ error: "orderId fehlt" }, { status: 400 });
 
     const supabase = await supabaseServerAuth();

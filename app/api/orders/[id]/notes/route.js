@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req, { params }) {
   try {
-    const id = params?.id;
+    const { id } = await params;
     if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
 
     const supabase = await supabaseServerAuth();

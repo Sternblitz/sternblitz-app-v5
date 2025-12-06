@@ -51,8 +51,8 @@ async function ensureReferralCode(admin, orderId, firstName, lastName) {
 
 export async function POST(req, { params }) {
   try {
-    const id = params?.id;
-    if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
+    const { id: orderId } = await params;
+    if (!orderId) return NextResponse.json({ error: "orderId fehlt" }, { status: 400 });
 
     const body = await req.json().catch(() => ({}));
     const toOverride = (body?.to || body?.email || "").trim();

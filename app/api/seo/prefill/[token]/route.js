@@ -27,7 +27,7 @@ function sanitize(row) {
 
 export async function GET(_req, { params }) {
   try {
-    const token = params?.token;
+    const { token } = await params;
     if (!token) return NextResponse.json({ error: "Token fehlt" }, { status: 400 });
     const admin = supabaseAdmin();
     const { data, error } = await admin

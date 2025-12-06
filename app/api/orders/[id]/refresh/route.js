@@ -68,7 +68,7 @@ async function fetchLiveStats(name, address) {
 
 export async function POST(_req, { params }) {
   try {
-    const id = params?.id;
+    const { id } = await params;
     if (!id) {
       return NextResponse.json({ error: "Order-ID fehlt." }, { status: 400 });
     }

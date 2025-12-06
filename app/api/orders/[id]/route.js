@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function DELETE(_req, { params }) {
   try {
-    const id = params?.id;
+    const { id } = await params;
     if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
 
     const supabase = await supabaseServerAuth();
@@ -39,7 +39,7 @@ export async function DELETE(_req, { params }) {
 
 export async function GET(_req, { params }) {
   try {
-    const id = params?.id;
+    const { id } = await params;
     if (!id) return NextResponse.json({ error: "id fehlt" }, { status: 400 });
     // Minimal public read: fetch limited fields via admin (used by external payment link)
     const admin = supabaseAdmin();

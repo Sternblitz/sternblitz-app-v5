@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 export async function POST(req, { params }) {
   try {
-    const orderId = params?.id;
+    const { id: orderId } = await params;
     if (!orderId) return NextResponse.json({ error: "orderId fehlt" }, { status: 400 });
 
     // auth: only ADMIN can charge
