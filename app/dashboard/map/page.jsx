@@ -33,59 +33,7 @@ export default function MapPage() {
     ];
 
     // Deep Scan Queries (Types & Keywords mixed)
-    const SCAN_QUERIES = [
-        // Gastro & Imbiss
-        { type: "restaurant" },
-        { type: "cafe" },
-        { type: "bar" },
-        { type: "bakery" },
-        { type: "meal_takeaway" },
-        { type: "meal_delivery" },
-        { keyword: "Döner" },
-        { keyword: "Kebab" },
-        { keyword: "Pizza" },
-        { keyword: "Burger" },
-        { keyword: "Imbiss" },
-        { keyword: "Currywurst" },
-        { keyword: "Sushi" },
-
-        // Beauty & Wellness
-        { type: "hair_care" },
-        { keyword: "Barber" },
-        { type: "beauty_salon" },
-        { keyword: "Nagelstudio" },
-        { keyword: "Kosmetik" },
-        { keyword: "Wimpern" },
-        { type: "spa" },
-        { type: "physiotherapist" },
-
-        // Services & Retail (No Clothing)
-        { type: "florist" },
-        { type: "liquor_store" }, // Spätis
-        { type: "car_repair" },
-        { type: "laundry" },
-        { type: "locksmith" },
-        { type: "dentist" },
-        { type: "doctor" },
-        { type: "real_estate_agency" },
-        { type: "insurance_agency" },
-
-        // Missing Important Categories
-        { type: "gym" }, // Fitness
-        { keyword: "Fitnessstudio" },
-        { type: "car_dealer" }, // Autohändler
-        { keyword: "Shisha" }, // Shisha Bars
-        { keyword: "Hookah" },
-        { keyword: "Kiosk" }, // Spätis/Kioske
-        { keyword: "Späti" },
-        { keyword: "Späti" },
-        { type: "night_club" }, // Clubs
-
-        // Niche
-        { keyword: "Tattoo" },
-        { keyword: "Solarium" },
-        { keyword: "Sonnenstudio" },
-    ];
+    // Deep Scan Queries moved to server-side /api/places/nearby
 
     // Load Visits from DB and convert to Places
     const loadVisits = async () => {
@@ -337,67 +285,76 @@ export default function MapPage() {
     };
 
     // Deep Scan (Street Sweeper)
-    const searchNearby = () => {
-        if (!mapInstance || !placesService || isScanning) return;
+    // Deep Scan (Street Sweeper) - Server Side
+    const searchNearby = async () => {
+        if (!mapInstance || isScanning) return;
         const center = mapInstance.getCenter();
         if (!center) return;
 
         setIsScanning(true);
-        setScanProgress("Starte Deep Scan...");
+        setScanProgress("Starte Deep Scan (Server)...");
 
-        // Fixed radius for walking distance density
-        const radius = 300;
-        const centerLoc = { lat: center.lat(), lng: center.lng() };
+        try {
+            const res = await fetch("/api/places/nearby", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    lat: center.lat(),
+                    lng: center.lng(),
+                    radius: 300
+                })
+            });
 
-        let allResults = [];
-        let completedCats = 0;
-        const totalCats = SCAN_QUERIES.length;
-
-        const checkDone = () => {
-            completedCats++;
-            setScanProgress(`Scanne... ${Math.round((completedCats / totalCats) * 100)}%`);
-
-            if (completedCats === totalCats) {
-                setIsScanning(false);
-                setScanProgress("");
-
-                // Deduplicate & Filter
-                const unique = new Map();
-                allResults.forEach(p => {
-                    const isBlocked = p.types?.some(t => BLOCKED_TYPES.includes(t));
-                    if (isBlocked) return;
-                    unique.set(p.place_id, p);
-                });
-
-                const processed = Array.from(unique.values()).map(p => {
-                    const loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
-                    const dist = myLoc ? getDistance(myLoc, loc) : null;
-                    return { ...p, dist, loc, category: translateType(p.types) };
-                });
-                setSearchResults(processed);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Scan failed (${res.status})`);
             }
-        };
 
-        // Fire parallel requests for each query
-        SCAN_QUERIES.forEach((q, idx) => {
-            // Stagger requests slightly to avoid instant rate limit
-            setTimeout(() => {
-                const request = {
-                    location: centerLoc,
-                    radius: radius,
+            const data = await res.json();
+            const results = data.results || [];
+
+            // Deduplicate & Filter
+            const unique = new Map();
+            results.forEach(p => {
+                const isBlocked = p.types?.some(t => BLOCKED_TYPES.includes(t));
+                if (isBlocked) return;
+                unique.set(p.place_id, p);
+            });
+
+            const processed = Array.from(unique.values()).map(p => {
+                // Server returns geometry.location as { lat, lng } object usually, 
+                // but we need to check format. Google Places API returns { lat: number, lng: number }
+                const lat = p.geometry.location.lat;
+                const lng = p.geometry.location.lng;
+
+                const loc = { lat, lng };
+                // Re-create geometry.location object with functions for compatibility if needed, 
+                // or just use loc.
+                // The existing code uses p.geometry.location.lat() function.
+                // We need to adapt it because JSON doesn't have functions.
+
+                const geometry = {
+                    location: {
+                        lat: () => lat,
+                        lng: () => lng
+                    }
                 };
 
-                if (q.type) request.type = q.type;
-                if (q.keyword) request.keyword = q.keyword;
+                const dist = myLoc ? getDistance(myLoc, loc) : null;
+                return { ...p, geometry, dist, loc, category: translateType(p.types) };
+            });
 
-                placesService.nearbySearch(request, (results, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                        allResults.push(...results);
-                    }
-                    checkDone();
-                });
-            }, idx * 120); // 120ms stagger
-        });
+            setSearchResults(processed);
+            setScanProgress(`Fertig! ${processed.length} gefunden.`);
+            setTimeout(() => setScanProgress(""), 3000);
+
+        } catch (e) {
+            console.error("Scan error", e);
+            setScanProgress("Fehler beim Scan");
+            setTimeout(() => setScanProgress(""), 3000);
+        } finally {
+            setIsScanning(false);
+        }
     };
 
     // Combine & Filter Places
