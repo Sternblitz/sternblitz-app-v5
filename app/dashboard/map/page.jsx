@@ -113,6 +113,68 @@ export default function MapPage() {
 
         // Render initial DB places
         renderMarkers(m, dbPlaces, {});
+
+        // POI Click Listener (Pay-per-Click)
+        m.addListener("click", (e) => {
+            if (e.placeId) {
+                e.stop(); // Prevent default Google InfoWindow
+
+                // Check if we already have it in our list to save a call
+                const existing = allPlaces.find(p => p.place_id === e.placeId);
+                if (existing) {
+                    setSelectedPlace(existing);
+                    return;
+                }
+
+                // Fetch details
+                const request = {
+                    placeId: e.placeId,
+                    fields: ["name", "formatted_address", "geometry", "rating", "user_ratings_total", "types", "formatted_phone_number", "website", "url", "vicinity"]
+                };
+
+                // Fetch details from Server (to enforce limit)
+                fetch("/api/places/details", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ placeId: e.placeId })
+                })
+                    .then(async (res) => {
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            if (res.status === 429) {
+                                alert("🛑 Tageslimit für Details erreicht!\n\nDu hast 40 Unternehmen heute angesehen.");
+                            } else {
+                                alert("Fehler beim Laden: " + (err.error || res.status));
+                            }
+                            return;
+                        }
+                        const data = await res.json();
+                        const place = data.result;
+
+                        if (place) {
+                            const processed = {
+                                place_id: e.placeId,
+                                name: place.name,
+                                vicinity: place.vicinity || place.formatted_address,
+                                loc: { lat: place.geometry.location.lat, lng: place.geometry.location.lng },
+                                geometry: { location: { lat: () => place.geometry.location.lat, lng: () => place.geometry.location.lng } },
+                                rating: place.rating,
+                                user_ratings_total: place.user_ratings_total,
+                                types: place.types,
+                                formatted_phone_number: place.formatted_phone_number,
+                                website: place.website,
+                                url: place.url,
+                                category: translateType(place.types)
+                            };
+                            setSelectedPlace(processed);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("Netzwerkfehler beim Laden der Details.");
+                    });
+            }
+        });
     };
 
     const locateMe = (map = mapInstance) => {
@@ -307,7 +369,14 @@ export default function MapPage() {
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || `Scan failed (${res.status})`);
+                const msg = err.error || `Scan failed (${res.status})`;
+
+                if (res.status === 429) {
+                    alert("🛑 Tageslimit erreicht!\n\nDu hast deine 10 Scans für heute verbraucht.\nKomm morgen wieder oder nutze die normale Google Maps App für mehr.");
+                    throw new Error("Limit reached");
+                }
+
+                throw new Error(msg);
             }
 
             const data = await res.json();
@@ -537,7 +606,7 @@ export default function MapPage() {
                     onClick={searchNearby}
                     disabled={isScanning}
                 >
-                    {isScanning ? scanProgress : "🔍 Deep Scan (300m)"}
+                    {isScanning ? scanProgress : "🔍 Scannen"}
                 </button>
             </div>
 

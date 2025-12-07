@@ -67,6 +67,46 @@ export async function POST(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const user = session.user;
+
+        // 1. Check Daily Limit (Fail-Open: If DB fails, allow scan)
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { data: profile, error: profileError } = await supabase
+                .from("profiles")
+                .select("daily_scan_count, last_scan_date")
+                .eq("user_id", user.id)
+                .single();
+
+            if (profile) {
+                let { daily_scan_count, last_scan_date } = profile;
+
+                // Reset if new day
+                if (last_scan_date !== today) {
+                    daily_scan_count = 0;
+                }
+
+                const DAILY_LIMIT = 10;
+                if (daily_scan_count >= DAILY_LIMIT) {
+                    return NextResponse.json({
+                        error: `Tageslimit erreicht (${DAILY_LIMIT} Scans/Tag). Komm morgen wieder!`
+                    }, { status: 429 });
+                }
+
+                // Increment count
+                await supabase
+                    .from("profiles")
+                    .update({
+                        daily_scan_count: daily_scan_count + 1,
+                        last_scan_date: today
+                    })
+                    .eq("user_id", user.id);
+            }
+        } catch (limitError) {
+            // Log but don't block. This handles cases where migration hasn't run yet.
+            console.warn("Daily limit check failed, proceeding anyway:", limitError);
+        }
+
         const body = await request.json();
         const { lat, lng, radius = 300 } = body;
 
@@ -80,27 +120,45 @@ export async function POST(request) {
             return NextResponse.json({ error: "Server config error" }, { status: 500 });
         }
 
-        const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
-        url.searchParams.set("location", `${lat},${lng}`);
-        url.searchParams.set("radius", radius);
-        url.searchParams.set("type", "establishment");
-        url.searchParams.set("key", apiKey);
+        // 2. Budget Scan with Pagination (Max 3 pages = 60 results)
+        // Cost: 3 requests (still ~94% cheaper than 50)
 
-        try {
-            const res = await fetch(url.toString());
-            const data = await res.json();
-            const results = data.results || [];
+        const baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
+        const allResults = [];
+        let nextToken = null;
 
-            return NextResponse.json({
-                results: results,
-                count: results.length,
-                source: 'api'
-            });
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-        } catch (e) {
-            console.error("Places API error", e);
-            return NextResponse.json({ error: e.message }, { status: 500 });
+        // Page 1
+        const url1 = new URL(baseUrl);
+        url1.searchParams.set("location", `${lat},${lng}`);
+        url1.searchParams.set("radius", radius);
+        url1.searchParams.set("type", "establishment");
+        url1.searchParams.set("key", apiKey);
+
+        const res1 = await fetch(url1.toString());
+        const data1 = await res1.json();
+        if (data1.results) allResults.push(...data1.results);
+        nextToken = data1.next_page_token;
+
+        // Page 2
+        if (nextToken) {
+            await sleep(2000); // Token needs time to become valid
+            const url2 = new URL(baseUrl);
+            url2.searchParams.set("pagetoken", nextToken);
+            url2.searchParams.set("key", apiKey);
+
+            const res2 = await fetch(url2.toString());
+            const data2 = await res2.json();
+            if (data2.results) allResults.push(...data2.results);
+            // No Page 3
         }
+
+        return NextResponse.json({
+            results: allResults,
+            count: allResults.length,
+            source: 'api-paged'
+        });
     } catch (e) {
         console.error("Deep scan error", e);
         return NextResponse.json({ error: e.message }, { status: 500 });
