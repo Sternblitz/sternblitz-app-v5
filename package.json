@@ -18,17 +18,20 @@
     "@stripe/react-stripe-js": "^2.7.1",
     "@stripe/stripe-js": "^3.5.0",
     "@supabase/auth-helpers-nextjs": "0.10.0",
-    "@supabase/supabase-js": "2.46.1",
+    "@supabase/supabase-js": "^2.46.1",
     "canvas-confetti": "^1.9.4",
+    "dotenv": "^17.2.3",
     "lucide-react": "^0.555.0",
     "next": "^16.0.7",
     "pdf-lib": "1.17.1",
+    "pg": "^8.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-joyride": "^2.9.3",
     "recharts": "^3.5.1",
     "resend": "3.2.0",
-    "stripe": "^16.0.0"
+    "stripe": "^16.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "19.2.2",

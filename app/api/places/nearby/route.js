@@ -86,7 +86,7 @@ export async function POST(request) {
                     daily_scan_count = 0;
                 }
 
-                const DAILY_LIMIT = 10;
+                const DAILY_LIMIT = 5;
                 if (daily_scan_count >= DAILY_LIMIT) {
                     return NextResponse.json({
                         error: `Tageslimit erreicht (${DAILY_LIMIT} Scans/Tag). Komm morgen wieder!`

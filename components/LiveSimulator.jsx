@@ -110,6 +110,16 @@ export default function LiveSimulator() {
     }
   };
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (window.google?.maps?.places) {
+        clearInterval(interval);
+        onGoogleLoad();
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
   // ---------- Fetch & Countdown ----------
   const startCountdown = (secs = 4) => {
     let n = secs;

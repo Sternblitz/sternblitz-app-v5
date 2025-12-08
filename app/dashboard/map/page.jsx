@@ -8,12 +8,14 @@ import { supabase } from "@/lib/supabaseClient";
 export default function MapPage() {
     const router = useRouter();
     const mapRef = useRef(null);
+    const isInitializing = useRef(false);
     const [mapInstance, setMapInstance] = useState(null);
     const [placesService, setPlacesService] = useState(null);
 
     const [visits, setVisits] = useState({}); // Map: place_id -> visit object
     const [savedPlaces, setSavedPlaces] = useState([]); // Array of places from DB
     const [searchResults, setSearchResults] = useState([]); // Array of places from Search
+    const [staticLeads, setStaticLeads] = useState([]); // Leads from Excel import
 
     const [markers, setMarkers] = useState([]);
     const [selectedPlace, setSelectedPlace] = useState(null);
@@ -87,94 +89,107 @@ export default function MapPage() {
 
     // Init Map
     const initMap = async () => {
-        if (!window.google?.maps || !mapRef.current) return;
+        if (isInitializing.current || mapInstance) return;
+        isInitializing.current = true;
 
-        const { Map } = await google.maps.importLibrary("maps");
-        const { PlacesService } = await google.maps.importLibrary("places");
+        console.log("initMap called. Ref:", mapRef.current, "Google:", !!window.google);
+        if (!mapRef.current) {
+            isInitializing.current = false;
+            return;
+        }
 
-        const m = new Map(mapRef.current, {
-            center: { lat: 52.52, lng: 13.405 }, // Berlin default
-            zoom: 15,
-            mapId: "DEMO_MAP_ID",
-            disableDefaultUI: true,
-            zoomControl: false,
-            gestureHandling: "greedy",
-            styles: [
-                { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-                { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] }
-            ]
-        });
+        // Wait for Google Maps to be available
+        if (!window.google?.maps) {
+            console.log("Google Maps not ready yet");
+            isInitializing.current = false;
+            return;
+        }
 
-        setMapInstance(m);
-        setPlacesService(new PlacesService(m));
+        try {
+            const { Map } = await google.maps.importLibrary("maps");
 
-        const { dbPlaces } = await loadVisits();
-        locateMe(m);
-
-        // Render initial DB places
-        renderMarkers(m, dbPlaces, {});
-
-        // POI Click Listener (Pay-per-Click)
-        m.addListener("click", (e) => {
-            if (e.placeId) {
-                e.stop(); // Prevent default Google InfoWindow
-
-                // Check if we already have it in our list to save a call
-                const existing = allPlaces.find(p => p.place_id === e.placeId);
-                if (existing) {
-                    setSelectedPlace(existing);
-                    return;
-                }
-
-                // Fetch details
-                const request = {
-                    placeId: e.placeId,
-                    fields: ["name", "formatted_address", "geometry", "rating", "user_ratings_total", "types", "formatted_phone_number", "website", "url", "vicinity"]
-                };
-
-                // Fetch details from Server (to enforce limit)
-                fetch("/api/places/details", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ placeId: e.placeId })
-                })
-                    .then(async (res) => {
-                        if (!res.ok) {
-                            const err = await res.json().catch(() => ({}));
-                            if (res.status === 429) {
-                                alert("🛑 Tageslimit für Details erreicht!\n\nDu hast 40 Unternehmen heute angesehen.");
-                            } else {
-                                alert("Fehler beim Laden: " + (err.error || res.status));
-                            }
-                            return;
-                        }
-                        const data = await res.json();
-                        const place = data.result;
-
-                        if (place) {
-                            const processed = {
-                                place_id: e.placeId,
-                                name: place.name,
-                                vicinity: place.vicinity || place.formatted_address,
-                                loc: { lat: place.geometry.location.lat, lng: place.geometry.location.lng },
-                                geometry: { location: { lat: () => place.geometry.location.lat, lng: () => place.geometry.location.lng } },
-                                rating: place.rating,
-                                user_ratings_total: place.user_ratings_total,
-                                types: place.types,
-                                formatted_phone_number: place.formatted_phone_number,
-                                website: place.website,
-                                url: place.url,
-                                category: translateType(place.types)
-                            };
-                            setSelectedPlace(processed);
-                        }
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        alert("Netzwerkfehler beim Laden der Details.");
-                    });
+            // Safety check: Component might have unmounted during await
+            if (!mapRef.current) {
+                console.log("Map ref is null after import, aborting");
+                return;
             }
-        });
+
+            console.log("Creating Map instance...");
+            const m = new Map(mapRef.current, {
+                center: { lat: 48.7758, lng: 9.1829 }, // Stuttgart default
+                zoom: 14,
+                disableDefaultUI: true,
+                zoomControl: false,
+                gestureHandling: "greedy",
+                styles: [
+                    { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+                    { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] }
+                ]
+            });
+
+            setMapInstance(m);
+            console.log("Map instance created");
+
+            const { dbPlaces } = await loadVisits();
+            locateMe(m);
+
+            // Render initial DB places
+            renderMarkers(m, dbPlaces, {});
+
+            // Add listener for static leads
+            m.addListener("idle", () => {
+                fetchStaticLeads(m);
+            });
+
+        } catch (e) {
+            console.error("Error initializing map:", e);
+        }
+    };
+
+    // Fetch Static Leads (Excel Import)
+    const fetchStaticLeads = async (map) => {
+        if (!map) return;
+        const bounds = map.getBounds();
+        if (!bounds) return;
+
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+
+        try {
+            const res = await fetch("/api/places/static", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    north: ne.lat(),
+                    south: sw.lat(),
+                    east: ne.lng(),
+                    west: sw.lng()
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const leads = data.results || [];
+
+                // Convert to Place format
+                const formatted = leads.map(l => ({
+                    place_id: "static_" + l.id,
+                    name: l.name,
+                    vicinity: l.address,
+                    loc: { lat: l.lat, lng: l.lng },
+                    geometry: { location: { lat: () => l.lat, lng: () => l.lng } },
+                    category: l.category,
+                    rating: l.rating || 0,
+                    user_ratings_total: l.user_ratings_total || 0,
+                    color: l.color, // "rot", "gelb", "grau"
+                    isStatic: true
+                }));
+
+                setStaticLeads(formatted);
+            }
+        } catch (e) {
+            console.error("Failed to load static leads", e);
+        }
     };
 
     const locateMe = (map = mapInstance) => {
@@ -196,7 +211,9 @@ export default function MapPage() {
         );
     };
 
-    useEffect(() => { if (scriptLoaded) initMap(); }, [scriptLoaded]);
+    useEffect(() => {
+        if (scriptLoaded) initMap();
+    }, [scriptLoaded]);
 
     // Render Markers
     const renderMarkers = (map, placesToRender, currentVisits) => {
@@ -208,7 +225,16 @@ export default function MapPage() {
             const visit = currentVisits[place.place_id] || visits[place.place_id];
             const isTarget = (place.rating || 5) < 4.6;
             let color = "#94a3b8";
+
             if (visit) color = getColor(visit.status);
+            else if (place.isStatic) {
+                // Map Excel colors
+                const c = (place.color || "").toLowerCase();
+                if (c.includes("rot") || c.includes("red")) color = "#ef4444"; // Red
+                else if (c.includes("gelb") || c.includes("yellow")) color = "#eab308"; // Yellow
+                else if (c.includes("grau") || c.includes("grey") || c.includes("gray")) color = "#94a3b8"; // Grey
+                else color = "#ef4444"; // Default to red if unknown but imported
+            }
             else if (isTarget) color = "#ef4444";
 
             const marker = new google.maps.Marker({
@@ -222,17 +248,7 @@ export default function MapPage() {
             marker.addListener("click", () => {
                 const v = visits[place.place_id];
                 setSelectedPlace({ ...place, visit: v });
-                // Fetch details if missing
-                if (!place.formatted_phone_number && placesService) {
-                    placesService.getDetails({
-                        placeId: place.place_id,
-                        fields: ["formatted_phone_number", "url", "website", "rating", "user_ratings_total"]
-                    }, (details, st) => {
-                        if (st === google.maps.places.PlacesServiceStatus.OK && details) {
-                            setSelectedPlace(prev => ({ ...prev, ...details }));
-                        }
-                    });
-                }
+                // No fetching of extra details to save costs
             });
             newMarkers.push(marker);
         });
@@ -346,86 +362,6 @@ export default function MapPage() {
         return "Geschäft";
     };
 
-    // Deep Scan (Street Sweeper)
-    // Deep Scan (Street Sweeper) - Server Side
-    const searchNearby = async () => {
-        if (!mapInstance || isScanning) return;
-        const center = mapInstance.getCenter();
-        if (!center) return;
-
-        setIsScanning(true);
-        setScanProgress("Starte Deep Scan (Server)...");
-
-        try {
-            const res = await fetch("/api/places/nearby", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    lat: center.lat(),
-                    lng: center.lng(),
-                    radius: 300
-                })
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                const msg = err.error || `Scan failed (${res.status})`;
-
-                if (res.status === 429) {
-                    alert("🛑 Tageslimit erreicht!\n\nDu hast deine 10 Scans für heute verbraucht.\nKomm morgen wieder oder nutze die normale Google Maps App für mehr.");
-                    throw new Error("Limit reached");
-                }
-
-                throw new Error(msg);
-            }
-
-            const data = await res.json();
-            const results = data.results || [];
-
-            // Deduplicate & Filter
-            const unique = new Map();
-            results.forEach(p => {
-                const isBlocked = p.types?.some(t => BLOCKED_TYPES.includes(t));
-                if (isBlocked) return;
-                unique.set(p.place_id, p);
-            });
-
-            const processed = Array.from(unique.values()).map(p => {
-                // Server returns geometry.location as { lat, lng } object usually, 
-                // but we need to check format. Google Places API returns { lat: number, lng: number }
-                const lat = p.geometry.location.lat;
-                const lng = p.geometry.location.lng;
-
-                const loc = { lat, lng };
-                // Re-create geometry.location object with functions for compatibility if needed, 
-                // or just use loc.
-                // The existing code uses p.geometry.location.lat() function.
-                // We need to adapt it because JSON doesn't have functions.
-
-                const geometry = {
-                    location: {
-                        lat: () => lat,
-                        lng: () => lng
-                    }
-                };
-
-                const dist = myLoc ? getDistance(myLoc, loc) : null;
-                return { ...p, geometry, dist, loc, category: translateType(p.types) };
-            });
-
-            setSearchResults(processed);
-            setScanProgress(`Fertig! ${processed.length} gefunden.`);
-            setTimeout(() => setScanProgress(""), 3000);
-
-        } catch (e) {
-            console.error("Scan error", e);
-            setScanProgress("Fehler beim Scan");
-            setTimeout(() => setScanProgress(""), 3000);
-        } finally {
-            setIsScanning(false);
-        }
-    };
-
     // Combine & Filter Places
     const allPlaces = useMemo(() => {
         // Merge savedPlaces and searchResults, preferring searchResults for details
@@ -441,8 +377,15 @@ export default function MapPage() {
             map.set(p.place_id, { ...p, dist: myLoc ? getDistance(myLoc, p.loc) : null });
         });
 
+        // Add Static Leads (if not already visited)
+        staticLeads.forEach(p => {
+            if (!map.has(p.place_id)) {
+                map.set(p.place_id, { ...p, dist: myLoc ? getDistance(myLoc, p.loc) : null });
+            }
+        });
+
         return Array.from(map.values());
-    }, [savedPlaces, searchResults, myLoc]);
+    }, [savedPlaces, searchResults, staticLeads, myLoc]);
 
     // Apply Filters
     const filteredPlaces = useMemo(() => {
@@ -601,13 +544,7 @@ export default function MapPage() {
                 </div>
 
                 <button className="btn-locate" onClick={() => locateMe()}>📍</button>
-                <button
-                    className={`btn-search tour-map-scan ${isScanning ? "scanning" : ""}`}
-                    onClick={searchNearby}
-                    disabled={isScanning}
-                >
-                    {isScanning ? scanProgress : "🔍 Scannen"}
-                </button>
+                {/* Scan Button Removed */}
             </div>
 
             {/* LIST SECTION */}
@@ -673,85 +610,99 @@ export default function MapPage() {
             </div>
 
             {/* DRAWER */}
-            {selectedPlace && (
-                <div className="drawer-overlay" onClick={() => setSelectedPlace(null)}>
-                    <div className="drawer" onClick={e => e.stopPropagation()}>
-                        <div className="drawer-handle" />
-                        <button className="btn-close" onClick={() => setSelectedPlace(null)}>×</button>
+            {
+                selectedPlace && (
+                    <div className="drawer-overlay" onClick={() => setSelectedPlace(null)}>
+                        <div className="drawer" onClick={e => e.stopPropagation()}>
+                            <div className="drawer-handle" />
+                            <button className="btn-close" onClick={() => setSelectedPlace(null)}>×</button>
 
-                        {selectedPlace.visit && (
-                            <button className="btn-trash" onClick={deleteVisit}>🗑️</button>
-                        )}
+                            {selectedPlace.visit && (
+                                <button className="btn-trash" onClick={deleteVisit}>🗑️</button>
+                            )}
 
-                        <div className="d-header">
-                            <h2>{selectedPlace.name}</h2>
-                            <div className="d-meta">
-                                <span className={(selectedPlace.rating || 5) < 4.6 ? 'bad' : 'good'}>
-                                    {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : "-"} ⭐ ({selectedPlace.user_ratings_total || 0})
-                                </span>
-                                {selectedPlace.formatted_phone_number && (
-                                    <a href={`tel:${selectedPlace.formatted_phone_number}`} className="d-phone">
-                                        📞 {selectedPlace.formatted_phone_number}
-                                    </a>
-                                )}
-                                {selectedPlace.category && <div className="d-cat">{selectedPlace.category}</div>}
-                            </div>
-                            {/* Navigation Button */}
-                            <a
-                                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.name + " " + selectedPlace.vicinity)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn-nav"
-                            >
-                                🗺️ Navigation starten
-                            </a>
-                        </div>
+                            <div className="d-header">
+                                <h2>{selectedPlace.name}</h2>
+                                <div className="d-meta">
+                                    <span className={(selectedPlace.rating || 5) < 4.6 ? 'bad' : 'good'}>
+                                        {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : "-"} ⭐ ({selectedPlace.user_ratings_total || 0})
+                                    </span>
+                                    {selectedPlace.formatted_phone_number && (
+                                        <a href={`tel:${selectedPlace.formatted_phone_number}`} className="d-phone">
+                                            📞 {selectedPlace.formatted_phone_number}
+                                        </a>
+                                    )}
+                                    {selectedPlace.category && <div className="d-cat">{selectedPlace.category}</div>}
 
-                        <div className="d-actions">
-                            <div className="status-row">
-                                {[
-                                    { id: "interested", label: "🔥 Interesse", color: "#22c55e" },
-                                    { id: "later", label: "⏳ Später", color: "#f59e0b" },
-                                    { id: "not_interested", label: "❌ Kein Int.", color: "#334155" },
-                                    { id: "customer", label: "💎 Kunde", color: "#3b82f6" },
-                                ].map((opt) => (
-                                    <button
-                                        key={opt.id}
-                                        className={`st-btn ${selectedPlace.visit?.status === opt.id ? "active" : ""}`}
-                                        style={{ "--c": opt.color }}
-                                        onClick={() => saveStatus(opt.id, selectedPlace.visit?.notes)}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
+                                    {/* Static Lead Color Badge */}
+                                    {selectedPlace.isStatic && selectedPlace.color && (
+                                        <div className="d-cat" style={{
+                                            background: selectedPlace.color.includes('rot') || selectedPlace.color.includes('red') ? '#fee2e2' :
+                                                selectedPlace.color.includes('gelb') || selectedPlace.color.includes('yellow') ? '#fef9c3' : '#f1f5f9',
+                                            color: selectedPlace.color.includes('rot') || selectedPlace.color.includes('red') ? '#dc2626' :
+                                                selectedPlace.color.includes('gelb') || selectedPlace.color.includes('yellow') ? '#ca8a04' : '#64748b'
+                                        }}>
+                                            🎨 {selectedPlace.color.toUpperCase()}
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Navigation Button */}
+                                <a
+                                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.name + " " + selectedPlace.vicinity)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-nav"
+                                >
+                                    🗺️ Navigation starten
+                                </a>
                             </div>
 
-                            <textarea
-                                className="d-notes"
-                                placeholder="Notizen (z.B. Entscheider Name)..."
-                                defaultValue={selectedPlace.visit?.notes || ""}
-                                onBlur={(e) => saveStatus(selectedPlace.visit?.status || "todo", e.target.value)}
-                            />
+                            <div className="d-actions">
+                                <div className="status-row">
+                                    {[
+                                        { id: "interested", label: "🔥 Interesse", color: "#22c55e" },
+                                        { id: "later", label: "⏳ Später", color: "#f59e0b" },
+                                        { id: "not_interested", label: "❌ Kein Int.", color: "#334155" },
+                                        { id: "customer", label: "💎 Kunde", color: "#3b82f6" },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.id}
+                                            className={`st-btn ${selectedPlace.visit?.status === opt.id ? "active" : ""}`}
+                                            style={{ "--c": opt.color }}
+                                            onClick={() => saveStatus(opt.id, selectedPlace.visit?.notes)}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
 
-                            <button
-                                className="btn-main"
-                                onClick={() => {
-                                    // Set Profile for Dashboard Simulator
-                                    const profile = {
-                                        name: selectedPlace.name,
-                                        address: selectedPlace.vicinity,
-                                        url: selectedPlace.url || ""
-                                    };
-                                    sessionStorage.setItem("sb_selected_profile", JSON.stringify(profile));
-                                    router.push("/dashboard");
-                                }}
-                            >
-                                🚀 Simulator starten
-                            </button>
+                                <textarea
+                                    className="d-notes"
+                                    placeholder="Notizen (z.B. Entscheider Name)..."
+                                    defaultValue={selectedPlace.visit?.notes || ""}
+                                    onBlur={(e) => saveStatus(selectedPlace.visit?.status || "todo", e.target.value)}
+                                />
+
+                                <button
+                                    className="btn-main"
+                                    onClick={() => {
+                                        // Set Profile for Dashboard Simulator
+                                        const profile = {
+                                            name: selectedPlace.name,
+                                            address: selectedPlace.vicinity,
+                                            url: selectedPlace.url || ""
+                                        };
+                                        sessionStorage.setItem("sb_selected_profile", JSON.stringify(profile));
+                                        router.push("/dashboard");
+                                    }}
+                                >
+                                    🚀 Simulator starten
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             <style jsx>{`
                 .split-view { display: flex; flex-direction: column; height: 100vh; background: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -883,6 +834,6 @@ export default function MapPage() {
 
                 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
             `}</style>
-        </div>
+        </div >
     );
 }
