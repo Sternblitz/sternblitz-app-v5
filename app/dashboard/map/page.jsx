@@ -573,10 +573,21 @@ export default function MapPage() {
                         const isTarget = (p.rating || 5) < 4.6 && (p.user_ratings_total || 0) >= 10;
                         const isIrrelevant = (p.user_ratings_total || 0) < 10;
                         const visit = visits[p.place_id];
+
+                        // Determine Card Color Style
+                        let cardStyle = {};
+                        if (p.isStatic && p.color) {
+                            const c = p.color.toLowerCase();
+                            if (c.includes('rot') || c.includes('red')) cardStyle = { borderLeft: '4px solid #ef4444', background: '#fef2f2' };
+                            else if (c.includes('gelb') || c.includes('yellow')) cardStyle = { borderLeft: '4px solid #eab308', background: '#fefce8' };
+                            else if (c.includes('grau') || c.includes('grey')) cardStyle = { borderLeft: '4px solid #94a3b8', background: '#f8fafc' };
+                        }
+
                         return (
                             <div
                                 key={p.place_id}
                                 className={`place-card ${isTarget ? 'target' : ''} ${visit ? 'visited' : ''} ${isIrrelevant ? 'irrelevant' : ''}`}
+                                style={cardStyle}
                                 onClick={() => {
                                     setSelectedPlace({ ...p, visit });
                                     mapInstance?.panTo(p.loc);
@@ -624,7 +635,15 @@ export default function MapPage() {
                             <div className="d-header">
                                 <h2>{selectedPlace.name}</h2>
                                 <div className="d-meta">
-                                    <span className={(selectedPlace.rating || 5) < 4.6 ? 'bad' : 'good'}>
+                                    <span
+                                        className={(selectedPlace.rating || 5) < 4.6 ? 'bad' : 'good'}
+                                        style={selectedPlace.isStatic && selectedPlace.color ? {
+                                            color: selectedPlace.color.includes('rot') || selectedPlace.color.includes('red') ? '#dc2626' :
+                                                selectedPlace.color.includes('gelb') || selectedPlace.color.includes('yellow') ? '#ca8a04' : '#64748b',
+                                            fontWeight: '800',
+                                            fontSize: '18px'
+                                        } : {}}
+                                    >
                                         {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : "-"} ⭐ ({selectedPlace.user_ratings_total || 0})
                                     </span>
                                     {selectedPlace.formatted_phone_number && (
