@@ -18,7 +18,7 @@ export default function SignPage() {
       const current = JSON.parse(raw);
       const next = { ...current, ...update };
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {}
+    } catch { }
   };
   const loadSeoRepCode = () => {
     try {
@@ -73,7 +73,7 @@ export default function SignPage() {
       } else {
         sessionStorage.setItem(SEO_REP_KEY, next);
       }
-    } catch {}
+    } catch { }
   };
   // Remote share/prefill
   const [prefillToken, setPrefillToken] = useState(null);
@@ -117,7 +117,7 @@ export default function SignPage() {
         phone: next.phone,
       });
       setRepCode(loadSeoRepCode());
-    } catch {}
+    } catch { }
   }, []);
 
   // Prefill via share token (?t=...)
@@ -155,13 +155,13 @@ export default function SignPage() {
           });
           if (json?.rep_code) rememberRepCode(json.rep_code);
           setPrefillToken(t);
-          try { setShareToEmail(p?.email || ""); } catch {}
+          try { setShareToEmail(p?.email || ""); } catch { }
           persist(next);
         } catch (e) {
           console.warn("Prefill Fehler", e);
         }
       })();
-    } catch {}
+    } catch { }
   }, []);
 
 
@@ -210,7 +210,7 @@ export default function SignPage() {
         setSummary((s) => ({ ...s, googleProfile: fresh, googleUrl: url || "" }));
         persist({ googleProfile: fresh, googleUrl: url || "" });
       });
-    } catch {}
+    } catch { }
   };
 
   const onPlacesLoad = () => {
@@ -219,8 +219,7 @@ export default function SignPage() {
 
   useEffect(() => {
     if (editProfile) {
-      const t = setTimeout(() => initPlaces(), 30);
-      return () => clearTimeout(t);
+      loadGoogleMaps().then(() => initPlaces());
     }
   }, [editProfile]);
 
@@ -300,11 +299,11 @@ export default function SignPage() {
       setShareToken(token);
       setShowSharePanel(true);
       // Put in clipboard for convenience
-      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { }
       return { url, token };
     } catch (e) {
       setShareErr(e?.message || "Unbekannter Fehler");
-      try { alert(e?.message || "Fehler beim Erzeugen des Links"); } catch {}
+      try { alert(e?.message || "Fehler beim Erzeugen des Links"); } catch { }
       return null;
     } finally {
       setSharing(false);
@@ -357,7 +356,7 @@ export default function SignPage() {
       setEditContact(true);
       try {
         document.querySelector('.with-bar.yellow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } catch {}
+      } catch { }
       return;
     }
     if (!agree) {
@@ -407,7 +406,7 @@ export default function SignPage() {
 
       alert("Auftragsbestätigung erteilt – bitte Zahlungsdaten hinterlegen, damit wir loslegen.");
       if (json?.redirect) {
-        try { window.location.assign(json.redirect); } catch {}
+        try { window.location.assign(json.redirect); } catch { }
       }
     } catch (e) {
       alert("Fehler: " + (e?.message || String(e)));
@@ -420,11 +419,7 @@ export default function SignPage() {
   // Anzeige
   return (
     <main className="shell">
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-        strategy="afterInteractive"
-        onLoad={onPlacesLoad}
-      />
+
       <div className="page-container">
         {/* Action Bar (oben rechts) */}
         {canShare ? (
@@ -512,7 +507,7 @@ export default function SignPage() {
                     await navigator.clipboard.writeText(link);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
-                  } catch {}
+                  } catch { }
                 }}
               >
                 {copied ? 'Kopiert!' : 'Kopieren'}
@@ -635,7 +630,7 @@ export default function SignPage() {
                     {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
                   </label>
                   <label><span>E-Mail</span>
-                    <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v||'').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
+                    <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v || '').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
                     {errors.email ? <div className="err-msg">{errors.email}</div> : null}
                   </label>
                   <label><span>Telefon</span>
@@ -652,53 +647,53 @@ export default function SignPage() {
           </div>
         </section>
 
-      {/* Signatur */}
-      <section className="card signature">
-        <div className="sig-head">
-          <div className="sig-title">Unterschrift</div>
-          <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
-        </div>
+        {/* Signatur */}
+        <section className="card signature">
+          <div className="sig-head">
+            <div className="sig-title">Unterschrift</div>
+            <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
+          </div>
 
-        <div className="pad-wrap">
-          <canvas
-            ref={canvasRef}
-            className="pad"
-            onMouseDown={start}
-            onMouseMove={move}
-            onMouseUp={end}
-            onMouseLeave={end}
-            onTouchStart={start}
-            onTouchMove={move}
-            onTouchEnd={end}
-          />
-        </div>
+          <div className="pad-wrap">
+            <canvas
+              ref={canvasRef}
+              className="pad"
+              onMouseDown={start}
+              onMouseMove={move}
+              onMouseUp={end}
+              onMouseLeave={end}
+              onTouchStart={start}
+              onTouchMove={move}
+              onTouchEnd={end}
+            />
+          </div>
 
-        <label className="agree">
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-          <span>
-            Ich stimme den{" "}
-            <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
-            und den{" "}
-            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
-            zu.
-          </span>
-        </label>
-      </section>
+          <label className="agree">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+            <span>
+              Ich stimme den{" "}
+              <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
+              und den{" "}
+              <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
+              zu.
+            </span>
+          </label>
+        </section>
 
-      {/* Submit-Button unter der Card, wie gewünscht */}
-      <section className="actions center roomy">
-        <button
-          type="button"
-          className="submit-btn next"
-          onClick={submit}
-          disabled={saving}
-        >
-          <span className="label">
-            {saving ? "Wird gespeichert …" : "Unterschrift bestätigen"}
-          </span>
-          <span aria-hidden>✅</span>
-        </button>
-      </section>
+        {/* Submit-Button unter der Card, wie gewünscht */}
+        <section className="actions center roomy">
+          <button
+            type="button"
+            className="submit-btn next"
+            onClick={submit}
+            disabled={saving}
+          >
+            <span className="label">
+              {saving ? "Wird gespeichert …" : "Unterschrift bestätigen"}
+            </span>
+            <span aria-hidden>✅</span>
+          </button>
+        </section>
       </div>
 
       {/* Styles */}
