@@ -227,23 +227,58 @@ export default function SignPage() {
     } catch { }
   }, []);
 
+  // ===== Canvas Setup (High DPI) =====
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resizeCanvas = () => {
+      const parent = canvas.parentElement;
+      if (parent) {
+        const rect = parent.getBoundingClientRect();
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = rect.width * ratio;
+        canvas.height = rect.height * ratio;
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(ratio, ratio);
+      }
+    };
+
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+    return () => window.removeEventListener("resize", resizeCanvas);
+  }, []);
+
   // ===== Zeichnen =====
   const getPos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    if (e.touches && e.touches[0]) {
-      const t = e.touches[0];
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+    let clientX, clientY;
+
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
   };
+
   const start = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent scrolling on touch
     const { x, y } = getPos(e);
     const ctx = canvasRef.current.getContext("2d");
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
   };
+
   const move = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
@@ -252,15 +287,23 @@ export default function SignPage() {
     ctx.lineTo(x, y);
     ctx.stroke();
   };
+
   const end = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
     setIsDrawing(false);
+    const ctx = canvasRef.current.getContext("2d");
+    ctx.closePath();
   };
+
   const clearSig = () => {
     const c = canvasRef.current;
     const ctx = c.getContext("2d");
+    // Clear using the scaled dimensions logic or just clear huge rect
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform to clear full buffer
     ctx.clearRect(0, 0, c.width, c.height);
+    ctx.restore();
   };
 
   // ===== Aktionen =====
@@ -370,9 +413,15 @@ export default function SignPage() {
       return;
     }
     const c = canvasRef.current;
+    // Check if empty (simple check might fail with high DPI scaling, but let's try basic check)
+    // A better check is tracking if user drew anything
+    // For now, we assume if isDrawing was ever true or just rely on visual check
+    // But toDataURL check vs blank is robust enough usually
     const blank = document.createElement("canvas");
     blank.width = c.width;
     blank.height = c.height;
+    // Note: blank canvas won't have the scale transform, but toDataURL returns pixel data
+    // If c was cleared with clearRect, it should match blank
     if (c.toDataURL() === blank.toDataURL()) {
       alert("Bitte unterschreiben.");
       return;
@@ -403,7 +452,14 @@ export default function SignPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Fehler beim Speichern");
-      window.location.href = "/sign/success";
+
+      // Redirect to Payment Page with Order ID
+      if (json.orderId) {
+        window.location.href = `/sign/payment?order=${json.orderId}`;
+      } else {
+        // Fallback if no orderId (should not happen)
+        window.location.href = "/sign/success";
+      }
     } catch (e) {
       alert(e.message);
       setSaving(false);

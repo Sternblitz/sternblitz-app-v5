@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
 import Script from "next/script";
 import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
+import { loadGoogleMaps } from "@/lib/googleMaps";
 
 export default function LiveSimulator() {
   const inputRef = useRef(null);
@@ -70,6 +71,10 @@ export default function LiveSimulator() {
         }
       } catch { }
     })();
+  }, []);
+
+  useEffect(() => {
+    loadGoogleMaps().then(() => onGoogleLoad());
   }, []);
 
   // ---------- Google Places ----------
@@ -480,11 +485,7 @@ export default function LiveSimulator() {
   return (
     <>
       {/* Google Places laden */}
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-        strategy="afterInteractive"
-        onLoad={onGoogleLoad}
-      />
+      {/* Google Places laden via centralized loader */}
 
       <div className="review-container">
         <h3 className="section-title">
