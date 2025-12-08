@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
-import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { loadGoogleMaps } from "@/lib/googleMaps";
 
 export default function MapPage() {
     const router = useRouter();
@@ -21,7 +21,6 @@ export default function MapPage() {
     const [markers, setMarkers] = useState([]);
     const [selectedPlace, setSelectedPlace] = useState(null);
     const [myLoc, setMyLoc] = useState(null);
-    const [scriptLoaded, setScriptLoaded] = useState(false);
 
     const [filter, setFilter] = useState("all"); // all, todo, interested, later, customer
     const [dateFilter, setDateFilter] = useState("all"); // all, today, week
@@ -99,9 +98,11 @@ export default function MapPage() {
             return;
         }
 
-        // Wait for Google Maps to be available
-        if (!window.google?.maps) {
-            console.log("Google Maps not ready yet");
+        // Load Google Maps
+        try {
+            await loadGoogleMaps();
+        } catch (e) {
+            console.error("Google Maps load failed", e);
             isInitializing.current = false;
             return;
         }
@@ -214,8 +215,8 @@ export default function MapPage() {
     };
 
     useEffect(() => {
-        if (scriptLoaded) initMap();
-    }, [scriptLoaded]);
+        initMap();
+    }, []);
 
     // Render Markers with Clustering
     const renderMarkers = async (map, placesToRender, currentVisits) => {
@@ -561,12 +562,6 @@ export default function MapPage() {
 
     return (
         <div className="split-view">
-            <Script
-                src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`}
-                strategy="afterInteractive"
-                onLoad={() => setScriptLoaded(true)}
-            />
-
             {/* MAP SECTION */}
             <div className="map-section">
                 <div ref={mapRef} className="map-container" />

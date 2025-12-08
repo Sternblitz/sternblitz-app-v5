@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Script from "next/script";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
 import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
+import { loadGoogleMaps } from "@/lib/googleMaps";
 
 export const dynamic = "force-dynamic";
 
@@ -220,401 +220,6 @@ export default function SignPage() {
           });
           try { if (json?.rep_code) sessionStorage.setItem("sb_rep_code", json.rep_code); } catch { }
           setPrefillToken(t);
-          try { setShareToEmail(p?.email || ""); } catch { }
-        } catch (e) {
-          console.warn("Prefill Fehler", e);
-        }
-      })();
-    } catch { }
-  }, []);
-
-  // ===== Promo/Referral Info aus Session/Cookie laden =====
-  useEffect(() => {
-    (async () => {
-      try {
-        const isFresh = (() => {
-          try {
-            const flag = sessionStorage.getItem('sb_ref_from_empfehlen');
-            const ts = Number(sessionStorage.getItem('sb_ref_from_empfehlen_at'));
-            if (!flag || !Number.isFinite(ts)) return false;
-            const age = Date.now() - ts;
-            return age >= 0 && age <= 30 * 60 * 1000; // 30 Minuten gültig
-          } catch { return false; }
-        })();
-        let code = null;
-        let discount = 0;
-        try {
-          const storedCode = sessionStorage.getItem("sb_ref_code");
-          if (storedCode) code = storedCode;
-          const storedDiscount = sessionStorage.getItem("sb_ref_discount");
-          if (storedDiscount) discount = Number(storedDiscount) || 0;
-        } catch { }
-        if (typeof document !== "undefined") {
-          const match = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
-          if (!code && match) code = decodeURIComponent(match[1]);
-        }
-        if (!isFresh) {
-          try { sessionStorage.removeItem('sb_ref_code'); sessionStorage.removeItem('sb_ref_discount'); } catch { }
-          try { if (typeof document !== 'undefined') document.cookie = 'sb_ref=; Max-Age=0; Path=/'; } catch { }
-          setPromoInfo({ code: null, discount: 0 });
-          return;
-        }
-        if (code) {
-          if (!discount) discount = 2500;
-          setPromoInfo({ code: code.toUpperCase(), discount });
-        }
-      } catch { }
-    })();
-  }, []);
-
-  // ===== Canvas Setup (responsive, präzise auf Touch) =====
-  useEffect(() => {
-    const c = canvasRef.current;
-    if (!c) return;
-
-    const setup = () => {
-      const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      const rect = c.getBoundingClientRect();
-      const cssW = Math.max(1, Math.floor(rect.width));
-      const cssH = Math.max(1, Math.floor(rect.height));
-      c.width = cssW * ratio;
-      c.height = cssH * ratio;
-      const ctx = c.getContext("2d");
-      // Reset Transform, dann sauber skalieren
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(ratio, ratio);
-      ctx.lineWidth = 2.4;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "#0f172a";
-    };
-
-    setup();
-    window.addEventListener("resize", setup);
-    return () => window.removeEventListener("resize", setup);
-  }, []);
-
-  // ===== Google Places (Profil-Edit) =====
-  const initPlaces = () => {
-    try {
-      if (!window.google || !window.google.maps || !window.google.maps.places) {
-        // Retry if not ready
-        setTimeout(initPlaces, 500);
-        return;
-      }
-      if (!formGoogleInputRef.current) return;
-      const g = window.google;
-      const ac = new g.maps.places.Autocomplete(formGoogleInputRef.current, {
-        types: ["establishment"],
-        fields: ["name", "formatted_address", "url", "place_id"],
-      });
-      ac.addListener("place_changed", () => {
-        const place = ac.getPlace() || {};
-        const name = place?.name || "";
-        const address = place?.formatted_address || "";
-        const url = place?.url || "";
-        const fresh = [name, address].filter(Boolean).join(", ");
-        setGoogleField(fresh);
-        setSummary((s) => ({ ...s, googleProfile: fresh, googleUrl: url || "" }));
-        setProfileSource({ name, address });
-        try {
-          const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
-          const payload = JSON.parse(raw);
-          payload.googleProfile = fresh;
-          payload.googleUrl = url || "";
-          sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-        } catch { }
-      });
-    } catch { }
-  };
-
-  const onPlacesLoad = () => {
-    initPlaces();
-  };
-
-  useEffect(() => {
-    if (editProfile) {
-      const t = setTimeout(() => initPlaces(), 30);
-      return () => clearTimeout(t);
-    }
-  }, [editProfile]);
-
-  // ===== Zeichnen =====
-  const getPos = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    if (e.touches && e.touches[0]) {
-      const t = e.touches[0];
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-    }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-  const start = (e) => {
-    e.preventDefault();
-    const { x, y } = getPos(e);
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-  };
-  const move = (e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const { x, y } = getPos(e);
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-  const end = (e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    setIsDrawing(false);
-  };
-  const clearSig = () => {
-    const c = canvasRef.current;
-    const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, c.width, c.height);
-  };
-
-  // ===== Aktionen =====
-  const saveContact = () => {
-    setSummary((s) => ({ ...s, ...contactDraft }));
-    try {
-      const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
-      const payload = JSON.parse(raw);
-      Object.assign(payload, contactDraft);
-      sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-    } catch { }
-    setEditContact(false);
-  };
-
-  const changeOption = (val) => {
-    setSummary((s) => ({ ...s, selectedOption: val }));
-    try {
-      const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
-      const payload = JSON.parse(raw);
-      payload.selectedOption = val;
-      sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-    } catch { }
-    setEditOptionOpen(false);
-  };
-
-  // Erzeugt teilbaren Link (nur für interne Nutzer verfügbar)
-  const createShareLink = async () => {
-    setShareErr("");
-    setShareUrl("");
-    setSharing(true);
-    try {
-      let repCode = null;
-      try { repCode = sessionStorage.getItem("sb_rep_code") || null; } catch { }
-      const payload = {
-        googleProfile: summary.googleProfile,
-        googleUrl: summary.googleUrl,
-        selectedOption: summary.selectedOption,
-        company: summary.company,
-        firstName: summary.firstName,
-        lastName: summary.lastName,
-        street: summary.street,
-        zip: summary.zip,
-        city: summary.city,
-        email: summary.email,
-        phone: summary.phone,
-        counts: summary.counts,
-        stats: summary.stats,
-        stats: summary.stats,
-        customDiscount: summary.customDiscount,
-      };
-      const res = await fetch("/api/sign/prefill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payload, rep_code: repCode }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        const msg = json?.error || (res.status === 401 ? "Bitte zuerst einloggen, um einen Link zu erstellen." : "Fehler beim Erzeugen des Links");
-        throw new Error(msg);
-      }
-      const url = json?.url || "";
-      const token = json?.token || "";
-      setShareUrl(url);
-      setShareToken(token);
-      setShowSharePanel(true);
-      // Put in clipboard for convenience
-      try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { }
-      return { url, token };
-    } catch (e) {
-      setShareErr(e?.message || "Unbekannter Fehler");
-      try { alert(e?.message || "Fehler beim Erzeugen des Links"); } catch { }
-      return null;
-    } finally {
-      setSharing(false);
-    }
-  };
-
-  const sendShareEmail = async () => {
-    setEmailErr("");
-    setEmailSent(false);
-    setEmailSending(true);
-    try {
-      const email = (shareToEmail || "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Bitte gültige E‑Mail angeben");
-      // ensure we have a token
-      let token = shareToken;
-      if (!token) {
-        const created = await createShareLink();
-        token = created?.token || token || shareToken;
-      }
-      if (!token) throw new Error("Link konnte nicht erzeugt werden");
-      const res = await fetch('/api/sign/prefill/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, to_email: email }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || 'E-Mail Versand fehlgeschlagen');
-      setEmailSent(true);
-    } catch (e) {
-      setEmailErr(e?.message || 'E-Mail Versand fehlgeschlagen');
-    } finally {
-      setEmailSending(false);
-    }
-  };
-
-  // ===== Submit (PDF erzeugen + API call) =====
-  const submit = async () => {
-    // Inline Feld-Validierung (Kontakt)
-    const errs = {};
-    const emailOk = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((summary.email || '').trim());
-    const phoneDigits = String(summary.phone || '').replace(/\D/g, '');
-    if (!(summary.company || '').trim() || (summary.company || '').trim().length < 2) errs.company = 'Bitte Firma angeben';
-    if (!(summary.firstName || '').trim() || (summary.firstName || '').trim().length < 2) errs.firstName = 'Bitte Vorname (min. 2 Zeichen)';
-    if (!(summary.lastName || '').trim() || (summary.lastName || '').trim().length < 2) errs.lastName = 'Bitte Nachname (min. 2 Zeichen)';
-    if (!(summary.street || '').trim() || (summary.street || '').trim().length < 3) errs.street = 'Bitte Straße angeben';
-    if (!(summary.zip || '').trim() || (summary.zip || '').trim().length < 3) errs.zip = 'Bitte PLZ angeben';
-    if (!(summary.city || '').trim() || (summary.city || '').trim().length < 2) errs.city = 'Bitte Stadt angeben';
-    if (!emailOk) errs.email = 'Bitte gültige E‑Mail angeben';
-    if (phoneDigits.length < 6) errs.phone = 'Bitte gültige Telefonnummer angeben';
-    if (Object.keys(errs).length) {
-      setErrors(errs);
-      setEditContact(true);
-      try {
-        document.querySelector('.with-bar.yellow')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } catch { }
-      return;
-    }
-    if (!agree) {
-      alert("Bitte AGB & Datenschutz bestätigen.");
-      return;
-    }
-
-    const c = canvasRef.current;
-    const blank = document.createElement("canvas");
-    blank.width = c.width;
-    blank.height = c.height;
-    if (c.toDataURL() === blank.toDataURL()) {
-      alert("Bitte unterschreiben.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const signaturePng = c.toDataURL("image/png");
-
-      // aktuell eingeloggter User (falls vorhanden)
-      let sourceAccountId = null;
-      try {
-        const sb = supabaseClient();
-        const { data } = await sb.auth.getUser();
-        sourceAccountId = data?.user?.id || null;
-      } catch { }
-
-      // rep_code aus sessionStorage (setzt dein RepTracker)
-      let repCode = null;
-      try {
-        repCode = sessionStorage.getItem("sb_rep_code") || null;
-      } catch { }
-
-      // Referral Code aus Cookie/Session
-      let referralCode = null;
-      try {
-        referralCode = sessionStorage.getItem('sb_ref_code') || null;
-        if (!referralCode && typeof document !== 'undefined') {
-          const m = document.cookie.match(/(?:^|; )sb_ref=([^;]+)/);
-          referralCode = m ? decodeURIComponent(m[1]) : null;
-        }
-      } catch { }
-
-      const res = await fetch("/api/sign/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          googleProfile: summary.googleProfile,
-          googleUrl: summary.googleUrl,
-          selectedOption: summary.selectedOption,
-          company: summary.company,
-          firstName: summary.firstName,
-          lastName: summary.lastName,
-          street: summary.street,
-          zip: summary.zip,
-          city: summary.city,
-          email: summary.email,
-          phone: summary.phone,
-          signaturePng,
-          counts: summary.counts,        // 1–3 / 1–2 / 1 Stückzahl
-          stats: summary.stats,
-          statsSource: profileSource,
-          rep_code: repCode,             // neu
-          source_account_id: sourceAccountId, // neu
-          referralCode,
-          signLinkToken: prefillToken || null,
-          customDiscount: summary.customDiscount,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Unbekannter Fehler");
-
-      alert("Auftragsbestätigung erstellt.");
-      try { sessionStorage.setItem('sb_order_id', json?.orderId || ''); } catch (_) { }
-      try {
-        if (json?.referralCode) {
-          sessionStorage.setItem('sb_ref_my_code', json.referralCode);
-        }
-        if (typeof json?.discountCents === 'number') {
-          sessionStorage.setItem('sb_ref_discount', String(json.discountCents));
-        }
-      } catch { }
-      // Direkt zur Zahlungsseite weiterleiten (Karte/SEPA hinterlegen)
-      try { window.location.assign('/sign/payment'); } catch (_) { }
-    } catch (e) {
-      alert("Fehler: " + (e?.message || String(e)));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-
-  // Anzeige
-  const chosenLabel = optionLabel(summary.selectedOption);
-  const chosenCount = optionCount(summary.selectedOption, summary.counts);
-  const countText = fmtCount(chosenCount);
-  const basePriceCents = BASE_PRICE_CENTS;
-  const customDiscountCents = summary.customDiscount || 0;
-  const discountCents = customDiscountCents > 0 ? customDiscountCents : (promoInfo.discount || 0);
-  const finalPriceCents = computeFinal(basePriceCents, discountCents);
-  const basePriceFormatted = formatEUR(basePriceCents);
-  const finalPriceFormatted = formatEUR(finalPriceCents);
-
-  return (
-    <main className="shell">
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-        strategy="afterInteractive"
-        onLoad={onPlacesLoad}
-      />
-      <div className="page-container">
-        {/* Action Bar (oben rechts) */}
-        <div className="action-bar">
-          {currentUser ? (
-            <div className="actions">
               <button type="button" className="btn share" onClick={() => { setShowSharePanel(true); createShareLink(); }} disabled={sharing}>
                 <span className="emoji" aria-hidden>🔗</span>
                 {sharing ? 'Erzeuge Link…' : 'Link teilen'}
@@ -623,31 +228,33 @@ export default function SignPage() {
                 <span className="emoji" aria-hidden>✉️</span>
                 Per E‑Mail senden
               </button>
-            </div>
-          ) : null}
-        </div>
+            </div >
+          ) : null
+    }
+        </div >
 
-        {showEmailShare && (
-          <section className="share-email">
-            <label htmlFor="share-email-input">E‑Mail des Kunden</label>
-            <div className="row">
-              <input
-                id="share-email-input"
-                type="email"
-                placeholder="z. B. kundin@firma.de"
-                value={shareToEmail}
-                onChange={(e) => setShareToEmail(e.target.value)}
-              />
-              <button type="button" className="btn send" onClick={sendShareEmail} disabled={emailSending}>
-                {emailSending ? 'Sende…' : 'Senden'}
-              </button>
-            </div>
-            {emailErr ? <div className="err-msg">{emailErr}</div> : null}
-            {emailSent ? <div className="ok-msg">E‑Mail gesendet.</div> : null}
-          </section>
-        )}
-        {/* HERO */}
-        <section className="card card-hero">
+      { showEmailShare && (
+        <section className="share-email">
+          <label htmlFor="share-email-input">E‑Mail des Kunden</label>
+          <div className="row">
+            <input
+              id="share-email-input"
+              type="email"
+              placeholder="z. B. kundin@firma.de"
+              value={shareToEmail}
+              onChange={(e) => setShareToEmail(e.target.value)}
+            />
+            <button type="button" className="btn send" onClick={sendShareEmail} disabled={emailSending}>
+              {emailSending ? 'Sende…' : 'Senden'}
+            </button>
+          </div>
+          {emailErr ? <div className="err-msg">{emailErr}</div> : null}
+          {emailSent ? <div className="ok-msg">E‑Mail gesendet.</div> : null}
+        </section>
+      )
+  }
+        {/* HERO */ }
+    < section className = "card card-hero" >
           <div className="hero-head">
             <img
               className="logo"
@@ -683,11 +290,12 @@ export default function SignPage() {
               <span>Dauerhafte Entfernung</span>
             </div>
           </div>
-        </section>
+        </section >
 
-        {/* Share panel */}
-        {showSharePanel ? (
-          <section className="share-panel">
+    {/* Share panel */ }
+        {
+      showSharePanel?(
+          <section className = "share-panel" >
             <div className="share-head">
               <div className="title">Teilen</div>
               <button type="button" className="close" onClick={() => setShowSharePanel(false)} aria-label="Schließen">×</button>
@@ -732,273 +340,279 @@ export default function SignPage() {
                 <span className="ico" aria-hidden>✉️</span> E‑Mail
               </a>
             </div>
-            {shareErr ? <div className="share-err">{shareErr}</div> : null}
-          </section>
+            { shareErr ? <div className = "share-err" > { shareErr }</div> : null}
+          </section >
         ) : null}
 
-        {promoInfo.code ? (
-          <section className="promo-banner">
-            <div className="promo-line">🎉 Promo aktiv: {promoInfo.code}</div>
-            <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
-            <div className="promo-sub">Dein Rabatt wird automatisch berücksichtigt.</div>
-          </section>
+{
+  promoInfo.code ? (
+    <section className="promo-banner">
+      <div className="promo-line">🎉 Promo aktiv: {promoInfo.code}</div>
+      <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
+      <div className="promo-sub">Dein Rabatt wird automatisch berücksichtigt.</div>
+    </section>
+  ) : null
+}
+
+{
+  summary.customDiscount > 0 ? (
+    <section className="promo-banner special">
+      <div className="promo-line">🏷️ Spezial-Rabatt aktiv</div>
+      <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
+      <div className="promo-sub">Ein individueller Rabatt wurde hinterlegt.</div>
+    </section>
+  ) : null
+}
+
+{/* GRID: Profil + Option */ }
+<section className="grid-2">
+  {/* Google-Profil */}
+  <div className="card with-bar green">
+    <div className="bar">
+      <span>Google-Profil</span>
+      <button
+        type="button"
+        className="icon-btn"
+        onClick={() => {
+          setEditProfile((v) => !v);
+          setTimeout(() => formGoogleInputRef.current?.focus(), 30);
+        }}
+        title="Profil bearbeiten"
+      >
+        ✏️
+      </button>
+    </div>
+
+    {!editProfile ? (
+      <div className="content">
+        <div className="value">{summary.googleProfile || "—"}</div>
+        {summary.googleUrl ? (
+          <a className="open" href={summary.googleUrl} target="_blank" rel="noreferrer">Profil öffnen ↗</a>
         ) : null}
-
-        {summary.customDiscount > 0 ? (
-          <section className="promo-banner special">
-            <div className="promo-line">🏷️ Spezial-Rabatt aktiv</div>
-            <div className="promo-amount"><span className="old">{basePriceFormatted}</span> <span className="arrow">→</span> <span className="new">{finalPriceFormatted}</span></div>
-            <div className="promo-sub">Ein individueller Rabatt wurde hinterlegt.</div>
-          </section>
-        ) : null}
-
-        {/* GRID: Profil + Option */}
-        <section className="grid-2">
-          {/* Google-Profil */}
-          <div className="card with-bar green">
-            <div className="bar">
-              <span>Google-Profil</span>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => {
-                  setEditProfile((v) => !v);
-                  setTimeout(() => formGoogleInputRef.current?.focus(), 30);
-                }}
-                title="Profil bearbeiten"
-              >
-                ✏️
-              </button>
-            </div>
-
-            {!editProfile ? (
-              <div className="content">
-                <div className="value">{summary.googleProfile || "—"}</div>
-                {summary.googleUrl ? (
-                  <a className="open" href={summary.googleUrl} target="_blank" rel="noreferrer">Profil öffnen ↗</a>
-                ) : null}
-              </div>
-            ) : (
-              <div className="content">
-                <input
-                  ref={formGoogleInputRef}
-                  type="search"
-                  inputMode="search"
-                  placeholder='Unternehmen suchen … z. B. "Restaurant XY, Berlin"'
-                  value={googleField}
-                  onChange={(e) => setGoogleField(e.target.value)}
-                  className="text"
-                />
-                <div className="row-actions">
-                  <button type="button" className="btn ghost" onClick={() => { setEditProfile(false); setGoogleField(summary.googleProfile || ""); }}>
-                    Abbrechen
-                  </button>
-                  <button
-                    type="button"
-                    className="btn solid"
-                    onClick={() => {
-                      setSummary((s) => ({ ...s, googleProfile: googleField }));
-                      const parts = (googleField || "").split(",");
-                      const manualName = (parts.shift() || "").trim();
-                      const manualAddress = parts.join(",").trim();
-                      setProfileSource({
-                        name: manualName,
-                        address: manualAddress,
-                      });
-                      try {
-                        const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
-                        const payload = JSON.parse(raw);
-                        payload.googleProfile = googleField;
-                        sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
-                      } catch { }
-                      setEditProfile(false);
-                    }}
-                  >
-                    Speichern
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Zu löschende Bewertungen */}
-          <div className="card with-bar blue">
-            <div className="bar">
-              <span>Zu löschende Bewertungen</span>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => setEditOptionOpen(true)}
-                title="Bewertungs-Option ändern"
-              >
-                ✏️
-              </button>
-            </div>
-
-            <div className="content">
-              <div className="value">
-                {chosenLabel} <span className="count">{countText}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Option-Auswahl (Modal) */}
-        {editOptionOpen && (
-          <div className="modal" onClick={() => setEditOptionOpen(false)}>
-            <div className="sheet" onClick={(e) => e.stopPropagation()}>
-              <h3>Option wählen</h3>
-              <div className="option-list">
-                {[
-                  ["123", "1–3 ⭐ löschen"],
-                  ["12", "1–2 ⭐ löschen"],
-                  ["1", "1 ⭐ löschen"],
-                  ["custom", "Individuelle Löschungen"],
-                ].map(([val, label]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    className={`opt ${summary.selectedOption === val ? "on" : ""}`}
-                    onClick={() => changeOption(val)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <button className="btn ghost full" type="button" onClick={() => setEditOptionOpen(false)}>
-                Schließen
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Kontakt-Übersicht – Google Gelb/Orange */}
-        <section className="card with-bar yellow">
-          <div className="bar">
-            <span>Kontakt-Übersicht</span>
-            <button
-              className="icon-btn"
-              type="button"
-              onClick={() => setEditContact((v) => !v)}
-              title="Kontaktdaten bearbeiten"
-            >
-              ✏️
-            </button>
-          </div>
-
-          {!editContact ? (
-            <div className="contact-grid readonly">
-              <div><b>Firma:</b> {summary.company || "—"}</div>
-              <div><b>Vorname:</b> {summary.firstName || "—"}</div>
-              <div><b>Nachname:</b> {summary.lastName || "—"}</div>
-              <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Rechnungsadresse</div>
-              <div><b>Straße:</b> {summary.street || "—"}</div>
-              <div><b>PLZ/Stadt:</b> {(summary.zip || "—") + " " + (summary.city || "")}</div>
-              <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Kommunikation</div>
-              <div><b>E-Mail:</b> {summary.email || "—"}</div>
-              <div><b>Telefon:</b> {summary.phone || "—"}</div>
-            </div>
-          ) : (
-            <>
-              <div className="contact-grid">
-                <label><span>Firma</span>
-                  <input value={contactDraft.company} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, company: v })); setErrors((er) => ({ ...er, company: v.trim().length >= 2 ? null : 'Bitte Firma angeben' })); }} />
-                  {errors.company ? <div className="err-msg">{errors.company}</div> : null}
-                </label>
-                <label><span>Vorname</span>
-                  <input value={contactDraft.firstName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, firstName: v })); setErrors((er) => ({ ...er, firstName: v.trim().length >= 2 ? null : 'Bitte Vorname (min. 2 Zeichen)' })); }} />
-                  {errors.firstName ? <div className="err-msg">{errors.firstName}</div> : null}
-                </label>
-                <label><span>Nachname</span>
-                  <input value={contactDraft.lastName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, lastName: v })); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
-                  {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
-                </label>
-
-                <div style={{ gridColumn: "1/-1", marginTop: 12, marginBottom: 4, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Rechnungsadresse</div>
-
-                <label style={{ gridColumn: "1/-1" }}><span>Straße & Hausnummer</span>
-                  <input value={contactDraft.street} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, street: v })); setErrors((er) => ({ ...er, street: v.trim().length >= 3 ? null : 'Bitte Straße angeben' })); }} />
-                  {errors.street ? <div className="err-msg">{errors.street}</div> : null}
-                </label>
-                <label><span>PLZ</span>
-                  <input value={contactDraft.zip} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, zip: v })); setErrors((er) => ({ ...er, zip: v.trim().length >= 3 ? null : 'Bitte PLZ angeben' })); }} />
-                  {errors.zip ? <div className="err-msg">{errors.zip}</div> : null}
-                </label>
-                <label><span>Stadt</span>
-                  <input value={contactDraft.city} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, city: v })); setErrors((er) => ({ ...er, city: v.trim().length >= 2 ? null : 'Bitte Stadt angeben' })); }} />
-                  {errors.city ? <div className="err-msg">{errors.city}</div> : null}
-                </label>
-
-                <div style={{ gridColumn: "1/-1", marginTop: 12, marginBottom: 4, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Kommunikation</div>
-
-                <label><span>E-Mail</span>
-                  <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v || '').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
-                  {errors.email ? <div className="err-msg">{errors.email}</div> : null}
-                </label>
-                <label><span>Telefon</span>
-                  <input value={contactDraft.phone} placeholder="+49 151 2345678" onChange={(e) => { let v = e.target.value; v = v.replace(/[^\d+\s]/g, ''); if (!v.startsWith('+')) { const digits = v.replace(/\D/g, ''); if (digits.startsWith('0')) v = '+49 ' + digits.replace(/^0+/, ''); else if (digits) v = '+49 ' + digits; else v = '+49 '; } setContactDraft((d) => ({ ...d, phone: v })); const ok = String(v || '').replace(/\D/g, '').length >= 6; setErrors((er) => ({ ...er, phone: ok ? null : 'Bitte gültige Telefonnummer angeben' })); }} />
-                  {errors.phone ? <div className="err-msg">{errors.phone}</div> : null}
-                </label>
-              </div>
-              <div className="row-actions">
-                <button className="btn ghost" type="button" onClick={() => setEditContact(false)}>Abbrechen</button>
-                <button className="btn solid" type="button" onClick={saveContact}>Speichern</button>
-              </div>
-            </>
-          )}
-        </section>
-
-        {/* Signatur */}
-        <section className="card signature tour-sign-pad">
-          <div className="sig-head">
-            <div className="sig-title">Unterschrift</div>
-            <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
-          </div>
-
-          <div className="pad-wrap">
-            <canvas
-              ref={canvasRef}
-              className="pad"
-              onMouseDown={start}
-              onMouseMove={move}
-              onMouseUp={end}
-              onMouseLeave={end}
-              onTouchStart={start}
-              onTouchMove={move}
-              onTouchEnd={end}
-            />
-          </div>
-
-          <label className="agree">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-            <span>
-              Ich stimme den{" "}
-              <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
-              und den{" "}
-              <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
-              zu.
-            </span>
-          </label>
-        </section>
-
-        {/* Submit-Button unter der Card, wie gewünscht */}
-        <section className="actions center roomy">
+      </div>
+    ) : (
+      <div className="content">
+        <input
+          ref={formGoogleInputRef}
+          type="search"
+          inputMode="search"
+          placeholder='Unternehmen suchen … z. B. "Restaurant XY, Berlin"'
+          value={googleField}
+          onChange={(e) => setGoogleField(e.target.value)}
+          className="text"
+        />
+        <div className="row-actions">
+          <button type="button" className="btn ghost" onClick={() => { setEditProfile(false); setGoogleField(summary.googleProfile || ""); }}>
+            Abbrechen
+          </button>
           <button
             type="button"
-            className="submit-btn next tour-sign-submit"
-            onClick={submit}
-            disabled={saving}
+            className="btn solid"
+            onClick={() => {
+              setSummary((s) => ({ ...s, googleProfile: googleField }));
+              const parts = (googleField || "").split(",");
+              const manualName = (parts.shift() || "").trim();
+              const manualAddress = parts.join(",").trim();
+              setProfileSource({
+                name: manualName,
+                address: manualAddress,
+              });
+              try {
+                const raw = sessionStorage.getItem("sb_checkout_payload") || "{}";
+                const payload = JSON.parse(raw);
+                payload.googleProfile = googleField;
+                sessionStorage.setItem("sb_checkout_payload", JSON.stringify(payload));
+              } catch { }
+              setEditProfile(false);
+            }}
           >
-            <span className="label">
-              {saving ? "Wird gespeichert …" : "Unterschrift bestätigen"}
-            </span>
-            <span aria-hidden>✅</span>
+            Speichern
           </button>
-        </section>
+        </div>
       </div>
+    )}
+  </div>
 
-      {/* Styles */}
-      <style jsx>{`
+  {/* Zu löschende Bewertungen */}
+  <div className="card with-bar blue">
+    <div className="bar">
+      <span>Zu löschende Bewertungen</span>
+      <button
+        type="button"
+        className="icon-btn"
+        onClick={() => setEditOptionOpen(true)}
+        title="Bewertungs-Option ändern"
+      >
+        ✏️
+      </button>
+    </div>
+
+    <div className="content">
+      <div className="value">
+        {chosenLabel} <span className="count">{countText}</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{/* Option-Auswahl (Modal) */ }
+{
+  editOptionOpen && (
+    <div className="modal" onClick={() => setEditOptionOpen(false)}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h3>Option wählen</h3>
+        <div className="option-list">
+          {[
+            ["123", "1–3 ⭐ löschen"],
+            ["12", "1–2 ⭐ löschen"],
+            ["1", "1 ⭐ löschen"],
+            ["custom", "Individuelle Löschungen"],
+          ].map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              className={`opt ${summary.selectedOption === val ? "on" : ""}`}
+              onClick={() => changeOption(val)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button className="btn ghost full" type="button" onClick={() => setEditOptionOpen(false)}>
+          Schließen
+        </button>
+      </div>
+    </div>
+  )
+}
+
+{/* Kontakt-Übersicht – Google Gelb/Orange */ }
+<section className="card with-bar yellow">
+  <div className="bar">
+    <span>Kontakt-Übersicht</span>
+    <button
+      className="icon-btn"
+      type="button"
+      onClick={() => setEditContact((v) => !v)}
+      title="Kontaktdaten bearbeiten"
+    >
+      ✏️
+    </button>
+  </div>
+
+  {!editContact ? (
+    <div className="contact-grid readonly">
+      <div><b>Firma:</b> {summary.company || "—"}</div>
+      <div><b>Vorname:</b> {summary.firstName || "—"}</div>
+      <div><b>Nachname:</b> {summary.lastName || "—"}</div>
+      <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Rechnungsadresse</div>
+      <div><b>Straße:</b> {summary.street || "—"}</div>
+      <div><b>PLZ/Stadt:</b> {(summary.zip || "—") + " " + (summary.city || "")}</div>
+      <div style={{ gridColumn: "1/-1", marginTop: 4, marginBottom: 2, fontSize: 13, fontWeight: 800, color: "#64748b" }}>Kommunikation</div>
+      <div><b>E-Mail:</b> {summary.email || "—"}</div>
+      <div><b>Telefon:</b> {summary.phone || "—"}</div>
+    </div>
+  ) : (
+    <>
+      <div className="contact-grid">
+        <label><span>Firma</span>
+          <input value={contactDraft.company} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, company: v })); setErrors((er) => ({ ...er, company: v.trim().length >= 2 ? null : 'Bitte Firma angeben' })); }} />
+          {errors.company ? <div className="err-msg">{errors.company}</div> : null}
+        </label>
+        <label><span>Vorname</span>
+          <input value={contactDraft.firstName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, firstName: v })); setErrors((er) => ({ ...er, firstName: v.trim().length >= 2 ? null : 'Bitte Vorname (min. 2 Zeichen)' })); }} />
+          {errors.firstName ? <div className="err-msg">{errors.firstName}</div> : null}
+        </label>
+        <label><span>Nachname</span>
+          <input value={contactDraft.lastName} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, lastName: v })); setErrors((er) => ({ ...er, lastName: v.trim().length >= 2 ? null : 'Bitte Nachname (min. 2 Zeichen)' })); }} />
+          {errors.lastName ? <div className="err-msg">{errors.lastName}</div> : null}
+        </label>
+
+        <div style={{ gridColumn: "1/-1", marginTop: 12, marginBottom: 4, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Rechnungsadresse</div>
+
+        <label style={{ gridColumn: "1/-1" }}><span>Straße & Hausnummer</span>
+          <input value={contactDraft.street} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, street: v })); setErrors((er) => ({ ...er, street: v.trim().length >= 3 ? null : 'Bitte Straße angeben' })); }} />
+          {errors.street ? <div className="err-msg">{errors.street}</div> : null}
+        </label>
+        <label><span>PLZ</span>
+          <input value={contactDraft.zip} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, zip: v })); setErrors((er) => ({ ...er, zip: v.trim().length >= 3 ? null : 'Bitte PLZ angeben' })); }} />
+          {errors.zip ? <div className="err-msg">{errors.zip}</div> : null}
+        </label>
+        <label><span>Stadt</span>
+          <input value={contactDraft.city} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, city: v })); setErrors((er) => ({ ...er, city: v.trim().length >= 2 ? null : 'Bitte Stadt angeben' })); }} />
+          {errors.city ? <div className="err-msg">{errors.city}</div> : null}
+        </label>
+
+        <div style={{ gridColumn: "1/-1", marginTop: 12, marginBottom: 4, fontSize: 14, fontWeight: 800, color: "#0f172a" }}>Kommunikation</div>
+
+        <label><span>E-Mail</span>
+          <input type="email" value={contactDraft.email} onChange={(e) => { const v = e.target.value; setContactDraft((d) => ({ ...d, email: v })); const ok = /^(?=[^@\s]{1,64}@)[^@\s]+@[^@\s]+\.[^@\s]+$/.test((v || '').trim()); setErrors((er) => ({ ...er, email: ok ? null : 'Bitte gültige E‑Mail angeben' })); }} />
+          {errors.email ? <div className="err-msg">{errors.email}</div> : null}
+        </label>
+        <label><span>Telefon</span>
+          <input value={contactDraft.phone} placeholder="+49 151 2345678" onChange={(e) => { let v = e.target.value; v = v.replace(/[^\d+\s]/g, ''); if (!v.startsWith('+')) { const digits = v.replace(/\D/g, ''); if (digits.startsWith('0')) v = '+49 ' + digits.replace(/^0+/, ''); else if (digits) v = '+49 ' + digits; else v = '+49 '; } setContactDraft((d) => ({ ...d, phone: v })); const ok = String(v || '').replace(/\D/g, '').length >= 6; setErrors((er) => ({ ...er, phone: ok ? null : 'Bitte gültige Telefonnummer angeben' })); }} />
+          {errors.phone ? <div className="err-msg">{errors.phone}</div> : null}
+        </label>
+      </div>
+      <div className="row-actions">
+        <button className="btn ghost" type="button" onClick={() => setEditContact(false)}>Abbrechen</button>
+        <button className="btn solid" type="button" onClick={saveContact}>Speichern</button>
+      </div>
+    </>
+  )}
+</section>
+
+{/* Signatur */ }
+<section className="card signature tour-sign-pad">
+  <div className="sig-head">
+    <div className="sig-title">Unterschrift</div>
+    <button type="button" className="icon-btn" onClick={clearSig} title="Unterschrift löschen">🗑️</button>
+  </div>
+
+  <div className="pad-wrap">
+    <canvas
+      ref={canvasRef}
+      className="pad"
+      onMouseDown={start}
+      onMouseMove={move}
+      onMouseUp={end}
+      onMouseLeave={end}
+      onTouchStart={start}
+      onTouchMove={move}
+      onTouchEnd={end}
+    />
+  </div>
+
+  <label className="agree">
+    <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+    <span>
+      Ich stimme den{" "}
+      <a href={AGB_URL} target="_blank" rel="noopener noreferrer">AGB</a>{" "}
+      und den{" "}
+      <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">Datenschutzbestimmungen</a>{" "}
+      zu.
+    </span>
+  </label>
+</section>
+
+{/* Submit-Button unter der Card, wie gewünscht */ }
+<section className="actions center roomy">
+  <button
+    type="button"
+    className="submit-btn next tour-sign-submit"
+    onClick={submit}
+    disabled={saving}
+  >
+    <span className="label">
+      {saving ? "Wird gespeichert …" : "Unterschrift bestätigen"}
+    </span>
+    <span aria-hidden>✅</span>
+  </button>
+</section>
+      </div >
+
+  {/* Styles */ }
+  < style jsx > {`
         .action-bar{display:flex;justify-content:flex-end;align-items:center;margin:6px 2px}
         .action-bar .actions{display:flex;gap:8px}
         .btn{height:36px;border-radius:999px;border:1px solid #e5e7eb;background:#f5f7fb;color:#0f172a;font-weight:900;padding:0 14px}
@@ -1266,7 +880,7 @@ export default function SignPage() {
         .share-email input{flex:1;min-width:220px;height:46px;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:0 14px;font-size:15px}
         .ok-msg{color:#166534;margin-top:8px;font-weight:800}
         .err-msg{color:#b91c1c;margin-top:8px}
-      `}</style>
-    </main>
+      `}</style >
+    </main >
   );
 }
