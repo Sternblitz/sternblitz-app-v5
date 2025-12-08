@@ -11,6 +11,7 @@ export default function MapPage() {
     const isInitializing = useRef(false);
     const [mapInstance, setMapInstance] = useState(null);
     const [placesService, setPlacesService] = useState(null);
+    const markerClustererRef = useRef(null);
 
     const [visits, setVisits] = useState({}); // Map: place_id -> visit object
     const [savedPlaces, setSavedPlaces] = useState([]); // Array of places from DB
@@ -107,6 +108,7 @@ export default function MapPage() {
 
         try {
             const { Map } = await google.maps.importLibrary("maps");
+            const { MarkerClusterer } = await import("@googlemaps/markerclusterer");
 
             // Safety check: Component might have unmounted during await
             if (!mapRef.current) {
@@ -215,10 +217,14 @@ export default function MapPage() {
         if (scriptLoaded) initMap();
     }, [scriptLoaded]);
 
-    // Render Markers
-    const renderMarkers = (map, placesToRender, currentVisits) => {
-        // Clear existing
+    // Render Markers with Clustering
+    const renderMarkers = async (map, placesToRender, currentVisits) => {
+        // Clear existing markers
+        if (markerClustererRef.current) {
+            markerClustererRef.current.clearMarkers();
+        }
         markers.forEach(m => m.setMap(null));
+
         const newMarkers = [];
 
         placesToRender.forEach(place => {
@@ -238,7 +244,8 @@ export default function MapPage() {
             else if (isTarget) color = "#ef4444";
 
             const marker = new google.maps.Marker({
-                map: map, position: place.loc, title: place.name,
+                position: place.loc,
+                title: place.name,
                 icon: {
                     path: google.maps.SymbolPath.CIRCLE, scale: 6,
                     fillColor: color, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 1
@@ -248,11 +255,39 @@ export default function MapPage() {
             marker.addListener("click", () => {
                 const v = visits[place.place_id];
                 setSelectedPlace({ ...place, visit: v });
-                // No fetching of extra details to save costs
             });
             newMarkers.push(marker);
         });
+
         setMarkers(newMarkers);
+
+        // Initialize or Update Clusterer
+        const { MarkerClusterer } = await import("@googlemaps/markerclusterer");
+
+        const renderer = {
+            render: ({ count, position }) => {
+                return new google.maps.Marker({
+                    position,
+                    label: { text: String(count), color: "white", fontWeight: "bold" },
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 18,
+                        fillColor: "#0f172a", // Sternblitz Dark Blue
+                        fillOpacity: 0.9,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 2,
+                    },
+                    zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
+                });
+            },
+        };
+
+        if (!markerClustererRef.current) {
+            markerClustererRef.current = new MarkerClusterer({ map, markers: newMarkers, renderer });
+        } else {
+            markerClustererRef.current.clearMarkers();
+            markerClustererRef.current.addMarkers(newMarkers);
+        }
     };
 
     // Translate Types
