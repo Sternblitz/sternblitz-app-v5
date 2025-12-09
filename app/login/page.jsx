@@ -35,22 +35,27 @@ export default function LoginPage() {
 
   useEffect(() => {
     let active = true;
+
+    // Check if already logged in on mount
     const checkSession = async () => {
       try {
         const { data } = await supabase().auth.getSession();
         if (active && data?.session) {
           router.replace(redirectTarget);
         }
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
     };
 
     checkSession();
 
-    const { data: listener } = supabase().auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        router.replace(redirectTarget);
+    // Listener only for external changes (e.g. other tab login), NOT for manual login here
+    const { data: listener } = supabase().auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Only redirect if we are NOT currently submitting the form
+        // This prevents the race condition with onLogin's manual redirect
+        if (!loading) {
+          router.replace(redirectTarget);
+        }
       }
     });
 
@@ -58,7 +63,7 @@ export default function LoginPage() {
       active = false;
       listener?.subscription?.unsubscribe?.();
     };
-  }, [router, redirectTarget]);
+  }, [router, redirectTarget, loading]);
 
   const onLogin = async (e) => {
     e.preventDefault();

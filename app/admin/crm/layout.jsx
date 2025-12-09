@@ -68,6 +68,7 @@ export default function AdminCrmLayout({ children }) {
     { label: "Deals & Pipeline", href: "/admin/crm/deals", icon: Briefcase, roles: ["ADMIN", "MANAGER"] },
     { label: "Team & HR", href: "/admin/crm/team", icon: Users, roles: ["ADMIN"] },
     { label: "Recruiting", href: "/admin/crm/recruiting", icon: Zap, roles: ["ADMIN"] },
+    { label: "Kanban Board", href: "/admin/crm/kanban", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER"] },
   ];
 
   const navItems = allNavItems.filter(item => item.roles.includes(role));
