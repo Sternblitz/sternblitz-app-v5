@@ -740,14 +740,24 @@ export default function KanbanPage() {
         if (!deletionDeal) return;
 
         try {
+            // Calculate extra data
+            const counts = {
+                stars_1: Number(deletionDeal.start_bad_1) || 0,
+                stars_2: Number(deletionDeal.start_bad_2) || 0,
+                stars_3: Number(deletionDeal.start_bad_3) || 0,
+            };
+            const mapsLink = `https://www.google.com/maps/place/?q=place_id:${deletionDeal.google_place_id}`;
+
             const res = await fetch("/api/partner/deletion", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     orderId: deletionDeal.id,
                     placeId: deletionDeal.google_place_id,
-                    companyName: deletionDeal.company,
-                    ratingRange
+                    companyName: deletionDeal.google_profile || deletionDeal.company,
+                    ratingRange,
+                    reviewCounts: counts,
+                    googleMapsLink: mapsLink
                 })
             });
 

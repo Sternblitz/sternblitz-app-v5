@@ -2,6 +2,7 @@ import "./globals.css";
 import TopNav from "./components/TopNav";
 import HideTopNavOnLogin from "./components/HideTopNavOnLogin";
 import Tour from "./dashboard/Tour";
+import { Toaster } from "sonner";
 
 export const viewport = {
   themeColor: "#0b6cf2",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }) {
           <TopNav />
         </HideTopNavOnLogin>
         <Tour />
+        <Toaster position="top-center" richColors />
         {children}
       </body>
     </html>

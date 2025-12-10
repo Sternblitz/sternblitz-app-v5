@@ -12,6 +12,8 @@ export async function GET(request) {
 
   const upstream = `${upstreamBase}?name=${encodeURIComponent(name)}&address=${encodeURIComponent(address)}`;
 
+  console.log("🔍 Simulator Request URL:", upstream); // Debug Log
+
   try {
     const res = await fetch(upstream, {
       method: "GET",

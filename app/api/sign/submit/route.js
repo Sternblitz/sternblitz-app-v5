@@ -643,6 +643,7 @@ export async function POST(req) {
       `info@sternblitz.de · sternblitz.de\n`;
 
     if (process.env.RESEND_API_KEY && isValidFromOrReplyTo(process.env.RESEND_FROM || "")) {
+      console.log("📧 Attempting to send email to:", email);
       if (email) {
         // Build attachments: contract PDF (optional) + legal PDFs (AGB, Datenschutz)
         const attachments = [];
@@ -678,13 +679,18 @@ export async function POST(req) {
           ...(isValidFromOrReplyTo(process.env.RESEND_REPLY_TO || "") ? { reply_to: process.env.RESEND_REPLY_TO } : {}),
           ...(attachments.length ? { attachments } : {}),
         };
-        const { error: mailErr } = await resend.emails.send(payload);
-        if (mailErr) console.warn("Resend error:", mailErr);
+        console.log("📧 Sending payload via Resend...");
+        const { error: mailErr, data: mailData } = await resend.emails.send(payload);
+        if (mailErr) {
+          console.warn("❌ Resend error:", mailErr);
+        } else {
+          console.log("✅ Email sent successfully:", mailData);
+        }
       } else {
-        console.warn("Kein Empfänger (email) angegeben – E-Mail übersprungen.");
+        console.warn("⚠️ Kein Empfänger (email) angegeben – E-Mail übersprungen.");
       }
     } else {
-      console.warn("E-Mail nicht gesendet: RESEND_API_KEY/RESEND_FROM fehlt oder ungültig.");
+      console.warn("⚠️ E-Mail nicht gesendet: RESEND_API_KEY/RESEND_FROM fehlt oder ungültig.");
     }
 
     return NextResponse.json({

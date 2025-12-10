@@ -16,7 +16,7 @@ export async function POST(req) {
 
         // 2. Input Validation
         const body = await req.json();
-        const { orderId, placeId, companyName, ratingRange } = body;
+        const { orderId, placeId, companyName, ratingRange, reviewCounts, googleMapsLink } = body;
 
         if (!orderId || !placeId || !companyName) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -37,7 +37,9 @@ export async function POST(req) {
             outscraper_data: {
                 place_id: placeId
             },
-            rating_range: ratingRange || { min: 1, max: 3 } // Default 1-3
+            rating_range: ratingRange || { min: 1, max: 3 }, // Default 1-3
+            review_counts: reviewCounts,
+            google_maps_link: googleMapsLink
         };
 
         const partnerRes = await fetch(partnerUrl, {

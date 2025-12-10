@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase as supabaseClient } from "@/lib/supabaseClient";
 import { BASE_PRICE_CENTS, computeFinal, formatEUR } from "@/lib/pricing";
 import { loadGoogleMaps } from "@/lib/googleMaps";
+import { toast } from "sonner";
 
 export const dynamic = "force-dynamic";
 
@@ -507,7 +508,10 @@ export default function SignPage() {
 
       // Redirect to Payment Page with Order ID
       if (json.orderId) {
-        window.location.href = `/sign/payment?order=${json.orderId}`;
+        toast.success("Auftragsbestätigung gesendet! Weiterleitung...");
+        setTimeout(() => {
+          window.location.href = `/sign/payment?order=${json.orderId}`;
+        }, 1500);
       } else {
         // Fallback if no orderId (should not happen)
         window.location.href = "/sign/success";
