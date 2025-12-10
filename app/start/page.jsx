@@ -223,7 +223,13 @@ export default function StartPage() {
           const parts = googleProfile.split(",");
           const name = (parts.shift() || "").trim();
           const address = (parts.join(",") || "").trim();
-          const sel = { name, address, url: "" };
+          const raw = sessionStorage.getItem("sb_selected_profile");
+          const prev = raw ? JSON.parse(raw) : {};
+          const sel = {
+            name,
+            address,
+            url: prev.url || "",
+          };
           sessionStorage.setItem("sb_selected_profile", JSON.stringify(sel));
         } catch { }
       }

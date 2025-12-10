@@ -174,6 +174,7 @@ export async function POST(req) {
     const {
       googleProfile,
       googleUrl,
+      googlePlaceId,
       selectedOption,
       company,
       firstName,
@@ -287,7 +288,7 @@ export async function POST(req) {
     // Fallback: Promo aus Cookie `sb_ref` lesen, falls im Body nicht gesetzt
     if (!normalizedReferralCode) {
       try {
-        const c = cookies();
+        const c = await cookies();
         const cookieVal = c?.get?.("sb_ref")?.value || null;
         if (cookieVal) normalizedReferralCode = String(cookieVal).trim().toUpperCase();
       } catch { }
@@ -390,6 +391,7 @@ export async function POST(req) {
     const orderPayload = {
       google_profile: normalizedGoogleProfile,
       google_url: normalizedGoogleUrl,
+      google_place_id: cleanString(googlePlaceId),
       selected_option: cleanString(selectedOption),
       counts: sanitizedCounts,
       company: cleanString(company),

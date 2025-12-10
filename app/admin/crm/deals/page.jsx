@@ -35,8 +35,10 @@ import {
     ArrowRight,
     FileText,
     Plus,
-    X
+    X,
+    Rocket
 } from "lucide-react";
+import DeletionModal from "@/components/admin/DeletionModal";
 
 // --- Constants ---
 const COLUMNS = {
@@ -61,7 +63,7 @@ const COLUMN_IDS = ["INBOX", "PROCESSING", "SUCCESS_OPEN", "DONE"];
 
 // --- Helper Components ---
 
-function KanbanCard({ deal, isOverlay, onPayCommission, onDealClick }) {
+function KanbanCard({ deal, isOverlay, onPayCommission, onDealClick, onStartDeletion }) {
     const {
         attributes,
         listeners,
@@ -198,6 +200,24 @@ function KanbanCard({ deal, isOverlay, onPayCommission, onDealClick }) {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {/* Deletion Trigger */}
+                    {deal.google_place_id && !deal.deletion_started_at && (
+                        <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); onStartDeletion(deal); }}
+                            className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors border border-blue-100"
+                            title="Löschung starten"
+                        >
+                            <Rocket size={12} />
+                        </button>
+                    )}
+                    {deal.deletion_started_at && (
+                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100" title={`Gestartet: ${new Date(deal.deletion_started_at).toLocaleDateString()}`}>
+                            🚀 Gestartet
+                        </div>
+                    )}
+
+
                     {/* Commission Action */}
                     {deal.admin_stage === 'DONE' && deal.commission_status !== 'PAID' && (
                         <button
@@ -227,7 +247,7 @@ function KanbanCard({ deal, isOverlay, onPayCommission, onDealClick }) {
     );
 }
 
-function KanbanColumn({ id, title, color, deals, count, onPayCommission, onDealClick }) {
+function KanbanColumn({ id, title, color, deals, count, onPayCommission, onDealClick, onStartDeletion }) {
     const { setNodeRef } = useSortable({ id });
 
     return (
@@ -242,7 +262,13 @@ function KanbanColumn({ id, title, color, deals, count, onPayCommission, onDealC
             <div className="p-3 flex-1 overflow-y-auto space-y-3">
                 <SortableContext items={deals.map(d => d.id)} strategy={verticalListSortingStrategy}>
                     {deals.map((deal) => (
-                        <KanbanCard key={deal.id} deal={deal} onPayCommission={onPayCommission} onDealClick={onDealClick} />
+                        <KanbanCard
+                            key={deal.id}
+                            deal={deal}
+                            onPayCommission={onPayCommission}
+                            onDealClick={onDealClick}
+                            onStartDeletion={onStartDeletion}
+                        />
                     ))}
                 </SortableContext>
                 {deals.length === 0 && (
@@ -255,10 +281,14 @@ function KanbanColumn({ id, title, color, deals, count, onPayCommission, onDealC
     );
 }
 
+
+
 // --- Drawer Component ---
-function DealDetailsDrawer({ deal, onClose, onUpdate }) {
+function DealDetailsDrawer({ deal, onClose, onUpdate, onStartDeletion }) {
     const [notes, setNotes] = useState(deal.custom_notes || "");
     const [saving, setSaving] = useState(false);
+
+
 
     const handleSave = async () => {
         setSaving(true);
@@ -271,10 +301,14 @@ function DealDetailsDrawer({ deal, onClose, onUpdate }) {
             alert("Fehler beim Speichern: " + error.message);
         } else {
             onUpdate({ ...deal, custom_notes: notes });
-            onClose();
+            // onClose(); // Don't close, just update
         }
         setSaving(false);
     };
+
+
+
+    // Removed handleSubmitDeletion
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end">
@@ -297,6 +331,36 @@ function DealDetailsDrawer({ deal, onClose, onUpdate }) {
                 </div>
 
                 <div className="space-y-6 pb-6">
+                    {/* Deletion Section */}
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                        <h3 className="text-xs font-bold text-blue-600 uppercase mb-3 flex items-center gap-2">
+                            <Rocket size={14} />
+                            Löschung & Place ID
+                        </h3>
+                        <div className="bg-white/60 rounded-lg p-3 border border-blue-100/50 mb-3">
+                            <div className="text-[10px] text-slate-400 font-bold uppercase mb-1">Google Place ID</div>
+                            <div className="font-mono text-sm font-medium text-slate-700 select-all">
+                                {deal.google_place_id || "Keine ID vorhanden"}
+                            </div>
+                        </div>
+
+                        {deal.deletion_started_at ? (
+                            <div className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-100/50 p-3 rounded-lg">
+                                <Rocket size={16} />
+                                <span>Gestartet am {new Date(deal.deletion_started_at).toLocaleDateString()}</span>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => onStartDeletion(deal)}
+                                disabled={!deal.google_place_id}
+                                className="w-full py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                <Rocket size={16} />
+                                Löschung starten
+                            </button>
+                        )}
+                    </div>
+
                     {/* Status Section */}
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                         <h3 className="text-xs font-bold text-slate-500 uppercase mb-3">Status & Phase</h3>
@@ -309,6 +373,8 @@ function DealDetailsDrawer({ deal, onClose, onUpdate }) {
                             </span>
                         </div>
                     </div>
+
+
 
                     {/* Stammdaten (Contact Info) */}
                     <div>
@@ -413,6 +479,8 @@ function DealDetailsDrawer({ deal, onClose, onUpdate }) {
                     </button>
                 </div>
             </div>
+
+            {/* Removed DeletionModal from here */}
         </div>
     );
 }
@@ -428,6 +496,10 @@ export default function KanbanPage() {
     const [selectedDeal, setSelectedDeal] = useState(null); // For Drawer
     const [newDeal, setNewDeal] = useState({ company: "", first_name: "", last_name: "", email: "" });
     const [creating, setCreating] = useState(false);
+
+
+
+
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -623,30 +695,78 @@ export default function KanbanPage() {
             return;
         }
 
-        const { data, error } = await supabase().from("orders").insert({
-            company: newDeal.company,
-            first_name: newDeal.first_name,
-            last_name: newDeal.last_name,
-            email: newDeal.email,
-            status: 'NEW',
-            admin_stage: 'INBOX',
-            created_by: session.user.id,
-            org_id: profile.org_id,
-            google_profile: newDeal.company
-        }).select().single();
+        // 1. Create Deal
+        const { data, error } = await supabase()
+            .from("orders")
+            .insert([{
+                company: newDeal.company,
+                status: "LEAD",
+                admin_stage: "LEAD",
+                org_id: profile.org_id,
+                created_by: session.user.id,
+                source_account_id: session.user.id,
+                google_profile: newDeal.company, // Fallback
+                total_cents: 0, // Default
+            }])
+            .select()
+            .single();
 
         if (error) {
             alert("Fehler beim Erstellen: " + error.message);
+            setCreating(false);
         } else {
-            const dealWithProfile = {
-                ...data,
-                profiles: { full_name: "Du (Admin)" }
-            };
-            setDeals(prev => [dealWithProfile, ...prev]);
             setShowAddModal(false);
-            setNewDeal({ company: "", first_name: "", last_name: "", email: "" });
+            setNewDeal({
+                company: "",
+                first_name: "",
+                last_name: "",
+                email: "",
+                phone: ""
+            });
+            setCreating(false);
+            fetchDeals(); // Refresh
         }
-        setCreating(false);
+    };
+
+    const [showDeletionModal, setShowDeletionModal] = useState(false);
+    const [deletionDeal, setDeletionDeal] = useState(null);
+
+    const handleOpenDeletion = (deal) => {
+        setDeletionDeal(deal);
+        setShowDeletionModal(true);
+    };
+
+    const handleConfirmDeletion = async (ratingRange) => {
+        if (!deletionDeal) return;
+
+        try {
+            const res = await fetch("/api/partner/deletion", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId: deletionDeal.id,
+                    placeId: deletionDeal.google_place_id,
+                    companyName: deletionDeal.company,
+                    ratingRange
+                })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || "Fehler beim Starten");
+
+            // Update local state to show status immediately
+            setDeals(prev => prev.map(d =>
+                d.id === deletionDeal.id
+                    ? { ...d, deletion_started_at: new Date().toISOString() }
+                    : d
+            ));
+
+            alert("Löschung erfolgreich gestartet! 🚀");
+            setShowDeletionModal(false);
+            setDeletionDeal(null);
+        } catch (err) {
+            alert("Fehler: " + err.message);
+        }
     };
 
     const [refreshingAll, setRefreshingAll] = useState(false);
@@ -694,6 +814,7 @@ export default function KanbanPage() {
         setRefreshingAll(false);
         alert(`Erfolgreich aktualisiert! (${successCount}/${total} Deals)`);
     };
+
 
     const activeDeal = activeId ? deals.find(d => d.id === activeId) : null;
 
@@ -755,6 +876,7 @@ export default function KanbanPage() {
                             count={columns[colId].length}
                             onPayCommission={isManager ? undefined : handlePayCommission}
                             onDealClick={setSelectedDeal}
+                            onStartDeletion={handleOpenDeletion}
                         />
                     ))}
                 </div>
@@ -847,8 +969,17 @@ export default function KanbanPage() {
                     onUpdate={(updatedDeal) => {
                         setDeals(prev => prev.map(d => d.id === updatedDeal.id ? updatedDeal : d));
                     }}
+                    onStartDeletion={handleOpenDeletion}
                 />
             )}
+            {/* Deletion Modal */}
+            <DeletionModal
+                isOpen={showDeletionModal}
+                onClose={() => { setShowDeletionModal(false); setDeletionDeal(null); }}
+                onConfirm={handleConfirmDeletion}
+                placeId={deletionDeal?.google_place_id}
+                companyName={deletionDeal?.company}
+            />
         </div>
     );
 }

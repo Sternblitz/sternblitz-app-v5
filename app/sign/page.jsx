@@ -18,6 +18,7 @@ export default function SignPage() {
   const [summary, setSummary] = useState({
     googleProfile: "",
     googleUrl: "",
+    googlePlaceId: "",
     selectedOption: "",
     counts: { c123: null, c12: null, c1: null },
     stats: { totalReviews: null, averageRating: null, breakdown: null },
@@ -95,6 +96,7 @@ export default function SignPage() {
       let next = {
         googleProfile: p?.googleProfile || "",
         googleUrl: p?.googleUrl || "",
+        googlePlaceId: p?.googlePlaceId || "",
         selectedOption: p?.selectedOption || "",
         counts,
         stats: p?.stats || { totalReviews: null, averageRating: null, breakdown: null },
@@ -166,6 +168,52 @@ export default function SignPage() {
     } catch { }
   }, []);
 
+  // Recovery: If Place ID is missing, try to find it via Client-Side Places API
+  useEffect(() => {
+    if (!summary.googleProfile || summary.googlePlaceId) return;
+
+    const tryFind = () => {
+      try {
+        if (!window.google?.maps?.places) return;
+
+        // Construct query from available data
+        const queryParts = [summary.googleProfile];
+        if (summary.street) queryParts.push(summary.street);
+        if (summary.city) queryParts.push(summary.city);
+        const query = queryParts.join(", ");
+
+        const service = new window.google.maps.places.PlacesService(document.createElement('div'));
+        service.findPlaceFromQuery({
+          query,
+          fields: ['place_id', 'name', 'formatted_address']
+        }, (results, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+            const pid = results[0].place_id;
+            if (pid) {
+              console.log("Recovered Place ID:", pid);
+              setSummary(s => ({ ...s, googlePlaceId: pid }));
+            }
+          }
+        });
+      } catch (e) {
+        console.warn("Place ID recovery failed", e);
+      }
+    };
+
+    if (window.google?.maps?.places) {
+      tryFind();
+    } else {
+      // Wait for maps to load
+      const interval = setInterval(() => {
+        if (window.google?.maps?.places) {
+          clearInterval(interval);
+          tryFind();
+        }
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [summary.googleProfile, summary.googlePlaceId, summary.street, summary.city]);
+
   // Check user session for UI restrictions
   useEffect(() => {
     (async () => {
@@ -233,17 +281,19 @@ export default function SignPage() {
     if (!canvas) return;
 
     const resizeCanvas = () => {
-      const parent = canvas.parentElement;
-      if (parent) {
-        const rect = parent.getBoundingClientRect();
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-        canvas.width = rect.width * ratio;
-        canvas.height = rect.height * ratio;
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-        const ctx = canvas.getContext("2d");
-        ctx.scale(ratio, ratio);
-      }
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+
+      // Set actual bitmap size
+      canvas.width = rect.width * ratio;
+      canvas.height = rect.height * ratio;
+
+      // Ensure style matches (optional, but keeps it explicit)
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+
+      const ctx = canvas.getContext("2d");
+      ctx.scale(ratio, ratio);
     };
 
     resizeCanvas();
@@ -333,6 +383,7 @@ export default function SignPage() {
       const payload = {
         googleProfile: summary.googleProfile,
         googleUrl: summary.googleUrl,
+        googlePlaceId: summary.googlePlaceId,
         selectedOption: summary.selectedOption,
         counts: summary.counts,
         stats: summary.stats,
@@ -436,6 +487,7 @@ export default function SignPage() {
         body: JSON.stringify({
           googleProfile: summary.googleProfile,
           googleUrl: summary.googleUrl,
+          googlePlaceId: summary.googlePlaceId,
           selectedOption: summary.selectedOption,
           counts: summary.counts,
           stats: summary.stats,

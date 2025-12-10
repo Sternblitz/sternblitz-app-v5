@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { RefreshCw, CheckCircle } from "lucide-react"; // Assuming lucide-react is used for icons
 
 export const dynamic = "force-dynamic"; // Rebuild trigger
+
+
 
 const RANGE_OPTIONS = [
   { value: "all", label: "Alle" },
@@ -45,6 +48,8 @@ export default function OrdersPage() {
   const [confirmMsg, setConfirmMsg] = useState({}); // { [orderId]: string|null }
   const [notesDraft, setNotesDraft] = useState({}); // { [orderId]: { sales: string, admin: string } }
   const [promoOnly, setPromoOnly] = useState(false);
+
+
 
   const dateFormatter = useMemo(
     () =>
@@ -424,6 +429,8 @@ export default function OrdersPage() {
 
   // Sales KPIs werden separat im Ring berechnet (letzte 7 Tage)
 
+
+
   const renderRow = (row) => {
     const option = OPTION_LABELS[row?.selected_option] || row?.selected_option || "—";
     const metrics = computeMetrics(row);
@@ -594,6 +601,8 @@ export default function OrdersPage() {
               >
                 {isRefreshing ? "🔄 Aktualisiere…" : "🔄 Aktualisieren"}
               </button>
+
+
             </div>
           </div>
           <div className="summary-stats">
@@ -1192,6 +1201,7 @@ export default function OrdersPage() {
           .span2 { grid-column: auto; }
         }
       `}</style>
+
     </main >
   );
 }
@@ -1241,6 +1251,7 @@ function StatusControl({ value, onChange, disabled }) {
           box-shadow: 0 0 0 3px rgba(11,108,242,.15);
         }
       `}</style>
+
     </>
   );
 }
