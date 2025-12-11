@@ -1,64 +1,116 @@
-// app/api/reviews/route.js
+import { NextResponse } from 'next/server';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const name = searchParams.get("name") || "";
   const address = searchParams.get("address") || "";
 
-  // 1) Upstream-URL: aus ENV, sonst Default
-  const upstreamBase =
-    process.env.REVIEW_API ||
-    "https://sternblitz-review-simulator-cwnz.vercel.app/api/reviews";
+  // Helper to parse address
+  // Google Places usually: "Street 123, 12345 City, Country"
+  // Logic: Split by comma.
+  // Street = First part.
+  // City = Part with Zip Code (remove digits), or 2nd part.
+  let street = "";
+  let cityOnly = "";
 
-  const upstream = `${upstreamBase}?name=${encodeURIComponent(name)}&address=${encodeURIComponent(address)}`;
+  const parts = address.split(",").map(p => p.trim());
 
-  console.log("🔍 Simulator Request URL:", upstream); // Debug Log
+  if (parts.length > 0) {
+    street = parts[0];
+  } else {
+    street = name; // Fallback
+  }
+
+  // Find part with digits (Zip code)
+  const zipIndex = parts.findIndex(p => /\d{4,5}/.test(p));
+  if (zipIndex > -1) {
+    cityOnly = parts[zipIndex].replace(/[0-9]/g, "").trim();
+  } else {
+    // Fallback if no zip found: try 2nd part, or just use 1st part
+    cityOnly = parts.length > 1 ? parts[1] : parts[0];
+  }
+
+  // Cleanup city (remove "Deutschland" if it slipped in, though usually it's separate part)
+  cityOnly = cityOnly || "Unknown";
+
+  // Construct new params for the specific server requirement:
+  // company = Name
+  // city = Name + ", " + Street
+  // address = City
+  const newParams = new URLSearchParams();
+  newParams.set("company", name);
+  newParams.set("city", `${name}, ${street}`);
+  newParams.set("address", cityOnly);
+
+  const upstreamBase = "https://shareable-kaia-distressingly.ngrok-free.dev/get-reviews";
+  const upstream = `${upstreamBase}?${newParams.toString()}`;
+
+  console.log("🔍 Simulator Request URL:", upstream);
 
   try {
     const res = await fetch(upstream, {
       method: "GET",
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        "Accept": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      },
+      signal: AbortSignal.timeout(35000) // 35s timeout
     });
 
-    // 2) Wenn Upstream antwortet, aber mit Fehler → wir geben es sichtbar zurück
     if (!res.ok) {
+      // Log text for debugging
       const text = await res.text().catch(() => "");
-      // ---- Fallback-Demo-Daten, damit UI trotzdem rendert ----
-      const demo = {
-        averageRating: 3.7,
-        totalReviews: 421,
-        breakdown: { 1: 50, 2: 60, 3: 90, 4: 120, 5: 101 },
-        _fallback: true,
-        _reason: `Upstream ${res.status}`,
-        _upstream: upstream,
-        _body: text.slice(0, 500),
-      };
-      return new Response(JSON.stringify(demo), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      console.error(`Upstream Error ${res.status}: ${text}`);
+      throw new Error(`Upstream ${res.status}`);
     }
 
-    // 3) Normale Antwort durchreichen
     const data = await res.json();
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Expected format: { "reviews": { "1": 55, "2": 37, "3": 49, "4": 250, "5": 1815 } }
+
+    const reviews = data.reviews || {};
+    const r1 = Number(reviews["1"] || 0);
+    const r2 = Number(reviews["2"] || 0);
+    const r3 = Number(reviews["3"] || 0);
+    const r4 = Number(reviews["4"] || 0);
+    const r5 = Number(reviews["5"] || 0);
+
+    const totalReviews = r1 + r2 + r3 + r4 + r5;
+    let averageRating = 0.0;
+
+    if (totalReviews > 0) {
+      const sum = (1 * r1) + (2 * r2) + (3 * r3) + (4 * r4) + (5 * r5);
+      averageRating = Number((sum / totalReviews).toFixed(1));
+    }
+
+    const responsePayload = {
+      averageRating,
+      totalReviews,
+      breakdown: {
+        1: r1,
+        2: r2,
+        3: r3,
+        4: r4,
+        5: r5,
+      }
+    };
+
+    return NextResponse.json(responsePayload);
+
   } catch (e) {
-    // 4) Netzwerk-/Timeout-Fehler → Demo zurück, aber mit Grund
+    console.error("Simulator API Error:", e);
+
+    // Fallback Demo Data so the Simulator doesn't crash visually
+    // Similar to previous implementation
     const demo = {
       averageRating: 4.0,
       totalReviews: 250,
       breakdown: { 1: 20, 2: 25, 3: 35, 4: 80, 5: 90 },
       _fallback: true,
-      _reason: e?.message || String(e),
-      _upstream: upstream,
+      _reason: e.message,
+      _upstream: upstream
     };
-    return new Response(JSON.stringify(demo), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+
+    return NextResponse.json(demo);
   }
 }
