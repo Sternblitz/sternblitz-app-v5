@@ -75,6 +75,9 @@ export default function SignPage() {
   const shareLinkReady = Boolean(shareUrl);
   const safeShareUrl = shareLinkReady ? shareUrl : "";
 
+  // Success State for robust mobile feedback
+  const [success, setSuccess] = useState(false);
+
   // ===== Helpers =====
   const optionLabel = (opt) =>
     ({ "123": "1–3 ⭐", "12": "1–2 ⭐", "1": "1 ⭐", custom: "Individuell" }[opt] || "—");
@@ -506,16 +509,18 @@ export default function SignPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Fehler beim Speichern");
 
+      // Show robust success overlay
+      setSuccess(true);
+      toast.success("Auftragsbestätigung gespeichert.");
+
       // Redirect to Payment Page with Order ID
-      if (json.orderId) {
-        toast.success("Auftragsbestätigung gesendet! Weiterleitung...");
-        setTimeout(() => {
+      setTimeout(() => {
+        if (json.orderId) {
           window.location.href = `/sign/payment?order=${json.orderId}`;
-        }, 1500);
-      } else {
-        // Fallback if no orderId (should not happen)
-        window.location.href = "/sign/success";
-      }
+        } else {
+          window.location.href = "/sign/success";
+        }
+      }, 2000);
     } catch (e) {
       alert(e.message);
       setSaving(false);
@@ -536,7 +541,42 @@ export default function SignPage() {
 
   return (
     <main className="shell">
+      {success && (
+        <div className="success-overlay">
+          <div className="success-card">
+            <div className="icon">🎉</div>
+            <h2>Auftrag bestätigt!</h2>
+            <p>Wir leiten dich zur Zahlung weiter...</p>
+            <div className="spinner"></div>
+          </div>
+        </div>
+      )}
+
       <div className="page-container">
+        {/* Share Action Bar (Restored) */}
+        {!success && (
+          <div className="action-bar">
+            <div className="actions">
+              <button
+                type="button"
+                className="btn share"
+                onClick={async () => {
+                  if (!shareLinkReady) await createShareLink();
+                  setShowSharePanel(true);
+                }}
+              >
+                <span className="emoji">🔗</span> Link teilen
+              </button>
+              <button
+                type="button"
+                className="btn email"
+                onClick={() => setShowEmailShare((v) => !v)}
+              >
+                <span className="emoji">✉️</span> Als E-Mail
+              </button>
+            </div>
+          </div>
+        )}
         {
           showEmailShare && (
             <section className="share-email">
@@ -1186,6 +1226,28 @@ export default function SignPage() {
         .share-email input{flex:1;min-width:220px;height:46px;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:0 14px;font-size:15px}
         .ok-msg{color:#166534;margin-top:8px;font-weight:800}
         .err-msg{color:#b91c1c;margin-top:8px}
+        .err-msg{color:#b91c1c;margin-top:8px}
+        .success-overlay{
+          position:fixed;inset:0;z-index:9999;
+          background:rgba(255,255,255,.95);
+          display:flex;align-items:center;justify-content:center;
+          animation:fadeIn .3s ease forwards;
+        }
+        .success-card{
+          background:#fff;padding:32px;border-radius:24px;
+          text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.15);
+          border:1px solid #e5e7eb;
+          max-width:320px;width:100%;
+        }
+        .success-card .icon{font-size:48px;margin-bottom:16px}
+        .success-card h2{margin:0 0 8px;color:#0f172a}
+        .success-card p{color:#64748b;margin:0 0 24px}
+        .spinner{
+          width:24px;height:24px;border:3px solid #e5e7eb;border-top-color:#0b6cf2;
+          border-radius:50%;margin:0 auto;animation:spin .8s linear infinite;
+        }
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
       `}</style >
     </main>
   );

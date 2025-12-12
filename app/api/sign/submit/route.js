@@ -178,7 +178,7 @@ async function sendSlackNotification(payload) {
         type: "header",
         text: {
           type: "plain_text",
-          text: "🚀 Neuer Auftrag signed!",
+          text: "🚀 Neuer Deal! 🚀",
           emoji: true
         }
       },
@@ -187,11 +187,11 @@ async function sendSlackNotification(payload) {
         fields: [
           {
             type: "mrkdwn",
-            text: `*Kunde:*\n${customer}`
+            text: `*Kunde:*\n🏢 ${customer}`
           },
           {
             type: "mrkdwn",
-            text: `*Vertrieb:*\n${rep}`
+            text: `*Vertrieb:*\n👤 ${rep}`
           }
         ]
       },
@@ -200,7 +200,7 @@ async function sendSlackNotification(payload) {
         fields: [
           {
             type: "mrkdwn",
-            text: `*Paket:*\n${pkg}`
+            text: `*Paket:*\n📦 ${pkg}`
           }
         ]
       },
@@ -295,23 +295,23 @@ export async function POST(req) {
     }
 
     let isInternalUser = false;
+    let profile = null;
     if (user) {
-      const { data: profile, error: profileError } = await supabase
+      const { data: p, error: profileError } = await supabase
         .from("profiles")
-        .select("user_id, role, full_name, rep_code")
+        .select("user_id, role, full_name")
         .eq("user_id", user.id)
         .maybeSingle();
+      profile = p;
       if (profileError) {
-        console.error("sign/submit profile error", profileError);
-        return NextResponse.json({ error: "Profil konnte nicht geladen werden." }, { status: 500 });
+        console.warn("sign/submit profile error (ignoring)", profileError);
+        // return NextResponse.json({ error: "Profil konnte nicht geladen werden." }, { status: 500 });
       }
       if (!profile) {
-        return NextResponse.json(
-          { error: "Kein Profil hinterlegt. Bitte Admin benachrichtigen." },
-          { status: 403 }
-        );
+        console.warn("Kein Profil für User gefunden (fahre fort ohne Profil-Daten)");
+        // Kein harter Fehler, damit der Deal nicht blockiert wird
       }
-      isInternalUser = true; // jeder eingeloggte Nutzer gilt als intern; Rabatt daher gesperrt
+      isInternalUser = true; // jeder eingeloggte Nutzer gilt als intern
       if (source_account_id && source_account_id !== user.id) {
         console.warn("source_account_id does not match session user", {
           source_account_id,
@@ -319,6 +319,7 @@ export async function POST(req) {
         });
       }
     }
+
 
     const admin = supabaseAdmin();
 
@@ -754,16 +755,30 @@ export async function POST(req) {
     // 5) Slack Notification (Fire & Forget)
     // Rep-Name ermitteln: Entweder expliziter Rep-Code oder Name des eingeloggten Users
     let finalRep = orderPayload.rep_code;
-    if (!finalRep && isInternalUser && profile?.full_name) {
-      finalRep = profile.full_name; // Fallback auf eingeloggten User
+
+    // Fall 1: Eingeloggter User
+    if (isInternalUser && profile?.full_name) {
+      finalRep = profile.full_name;
+    } else if (orderPayload.created_by) {
+      // Fall 2: Remote/Sign-Link -> Ersteller suchen
+      try {
+        console.log("Slack Debug: Looking up creator for", orderPayload.created_by);
+        const { data: creator } = await admin
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", orderPayload.created_by)
+          .maybeSingle();
+        console.log("Slack Debug: Creator result", creator);
+        if (creator?.full_name) finalRep = creator.full_name;
+      } catch (e) {
+        console.warn("Slack creator lookup failed", e);
+      }
     }
-    if (!finalRep && isInternalUser && profile?.rep_code) {
-      finalRep = profile.rep_code;
-    }
+    console.log("Slack Debug: Final Rep Name:", finalRep);
 
     await sendSlackNotification({
       customer: normalizedGoogleProfile || "Unbekannt", // Kunde = Google Profil
-      rep: finalRep || "—",
+      rep: finalRep || "Online / Direkt",
       pkg: labelFor(orderPayload.selected_option),
     });
 
