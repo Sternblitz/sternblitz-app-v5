@@ -94,6 +94,9 @@ export default function SignPage() {
 
   // ===== Session laden =====
   useEffect(() => {
+    // Maps laden für Recovery
+    loadGoogleMaps();
+
     try {
       const p = JSON.parse(sessionStorage.getItem("sb_checkout_payload") || "{}");
       const counts = p?.counts || { c123: null, c12: null, c1: null };
@@ -755,7 +758,8 @@ export default function SignPage() {
                     type="button"
                     className="btn solid"
                     onClick={() => {
-                      setSummary((s) => ({ ...s, googleProfile: googleField }));
+                      // Place ID zurücksetzen, damit Recovery läuft
+                      setSummary((s) => ({ ...s, googleProfile: googleField, googlePlaceId: "" }));
                       const parts = (googleField || "").split(",");
                       const manualName = (parts.shift() || "").trim();
                       const manualAddress = parts.join(",").trim();
