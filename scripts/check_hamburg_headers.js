@@ -1,7 +1,7 @@
 const XLSX = require('xlsx');
 const path = require('path');
 
-const filePath = path.join(__dirname, '../Köln.xlsx');
+const filePath = path.join(__dirname, '../Hannover.xlsx');
 try {
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];

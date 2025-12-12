@@ -164,6 +164,64 @@ function sanitizeStats(stats) {
   };
 }
 
+// ------------------------------------------------------------------
+async function sendSlackNotification(payload) {
+  const url = process.env.SLACK_WEBHOOK_URL;
+  if (!url) return;
+
+  const { customer, rep, pkg } = payload;
+
+  // "Geiler" Style mit Slack Block Kit
+  const body = {
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "🚀 Neuer Auftrag signed!",
+          emoji: true
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Kunde:*\n${customer}`
+          },
+          {
+            type: "mrkdwn",
+            text: `*Vertrieb:*\n${rep}`
+          }
+        ]
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Paket:*\n${pkg}`
+          }
+        ]
+      },
+      {
+        type: "divider"
+      }
+    ]
+  };
+
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.error("Slack notification failed", e);
+  }
+}
+// ------------------------------------------------------------------
+
 // ---------- PDF ----------
 import { buildPdf } from "@/lib/pdfGenerator";
 
@@ -240,7 +298,7 @@ export async function POST(req) {
     if (user) {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("user_id, role")
+        .select("user_id, role, full_name, rep_code")
         .eq("user_id", user.id)
         .maybeSingle();
       if (profileError) {
@@ -692,6 +750,22 @@ export async function POST(req) {
     } else {
       console.warn("⚠️ E-Mail nicht gesendet: RESEND_API_KEY/RESEND_FROM fehlt oder ungültig.");
     }
+
+    // 5) Slack Notification (Fire & Forget)
+    // Rep-Name ermitteln: Entweder expliziter Rep-Code oder Name des eingeloggten Users
+    let finalRep = orderPayload.rep_code;
+    if (!finalRep && isInternalUser && profile?.full_name) {
+      finalRep = profile.full_name; // Fallback auf eingeloggten User
+    }
+    if (!finalRep && isInternalUser && profile?.rep_code) {
+      finalRep = profile.rep_code;
+    }
+
+    await sendSlackNotification({
+      customer: normalizedGoogleProfile || "Unbekannt", // Kunde = Google Profil
+      rep: finalRep || "—",
+      pkg: labelFor(orderPayload.selected_option),
+    });
 
     return NextResponse.json({
       ok: true,
