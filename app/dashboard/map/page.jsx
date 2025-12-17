@@ -747,14 +747,13 @@ export default function MapPage() {
                                 <button
                                     className="btn-main"
                                     onClick={() => {
-                                        // Set Profile for Dashboard Simulator
-                                        const profile = {
-                                            name: selectedPlace.name,
-                                            address: selectedPlace.vicinity,
-                                            url: selectedPlace.url || ""
-                                        };
-                                        sessionStorage.setItem("sb_selected_profile", JSON.stringify(profile));
-                                        router.push("/dashboard");
+                                        // Set Profile for Dashboard Simulator via URL (Clean & Stateless)
+                                        const params = new URLSearchParams();
+                                        params.set('name', selectedPlace.name);
+                                        params.set('address', selectedPlace.vicinity);
+                                        if (selectedPlace.url) params.set('url', selectedPlace.url);
+
+                                        router.push(`/dashboard?${params.toString()}`);
                                     }}
                                 >
                                     🚀 Simulator starten
