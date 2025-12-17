@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sternblitz Sales</string>
+    <string name="title_activity_main">Sternblitz Sales</string>
+    <string name="package_name">com.sternblitz.app</string>
+    <string name="custom_url_scheme">com.sternblitz.app</string>
+</resources>

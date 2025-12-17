@@ -1,0 +1,46 @@
+{
+  "name": "sternblitz-sales",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@googlemaps/google-maps-services-js": "^3.4.2",
+    "@googlemaps/js-api-loader": "^2.0.2",
+    "@googlemaps/markerclusterer": "^2.6.2",
+    "@stripe/react-stripe-js": "^2.7.1",
+    "@stripe/stripe-js": "^3.5.0",
+    "@supabase/auth-helpers-nextjs": "0.10.0",
+    "@supabase/supabase-js": "^2.46.1",
+    "canvas-confetti": "^1.9.4",
+    "dotenv": "^17.2.3",
+    "lucide-react": "^0.555.0",
+    "next": "^16.0.7",
+    "pdf-lib": "1.17.1",
+    "pg": "^8.16.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-joyride": "^2.9.3",
+    "recharts": "^3.5.1",
+    "resend": "3.2.0",
+    "sonner": "^2.0.7",
+    "stripe": "^16.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "autoprefixer": "^10.4.22",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "5.9.3"
+  }
+}
