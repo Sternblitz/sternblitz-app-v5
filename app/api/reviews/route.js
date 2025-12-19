@@ -55,7 +55,8 @@ export async function GET(request) {
         "Accept": "application/json",
         "ngrok-skip-browser-warning": "true"
       },
-      signal: AbortSignal.timeout(35000) // 35s timeout
+      // Increased timeout to 60s
+      signal: AbortSignal.timeout(60000)
     });
 
     if (!res.ok) {
@@ -66,8 +67,8 @@ export async function GET(request) {
     }
 
     const data = await res.json();
-    // Expected format: { "reviews": { "1": 55, "2": 37, "3": 49, "4": 250, "5": 1815 } }
 
+    // Validate data structure
     const reviews = data.reviews || {};
     const r1 = Number(reviews["1"] || 0);
     const r2 = Number(reviews["2"] || 0);
@@ -100,17 +101,17 @@ export async function GET(request) {
   } catch (e) {
     console.error("Simulator API Error:", e);
 
-    // Fallback Demo Data so the Simulator doesn't crash visually
-    // Similar to previous implementation
-    const demo = {
-      averageRating: 4.0,
-      totalReviews: 250,
-      breakdown: { 1: 20, 2: 25, 3: 35, 4: 80, 5: 90 },
-      _fallback: true,
-      _reason: e.message,
+    // Return empty state instead of fake data to avoid confusion
+    // User reported "80 1-3 stars" fallback was misleading
+    const errorState = {
+      averageRating: 0,
+      totalReviews: 0,
+      breakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      isError: true,
+      errorReason: e.message,
       _upstream: upstream
     };
 
-    return NextResponse.json(demo);
+    return NextResponse.json(errorState);
   }
 }
