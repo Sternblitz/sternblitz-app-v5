@@ -42,8 +42,9 @@ export async function GET(request) {
   newParams.set("city", `${name}, ${street}`);
   newParams.set("address", cityOnly);
 
-  const upstreamBase = "https://shareable-kaia-distressingly.ngrok-free.dev/get-reviews";
-  const upstream = `${upstreamBase}?${newParams.toString()}`;
+  // Use the stable Vercel API (same as orders/refresh route)
+  const upstreamBase = process.env.REVIEW_API || "https://sternblitz-review-simulator-cwnz.vercel.app/api/reviews";
+  const upstream = `${upstreamBase}?name=${encodeURIComponent(name)}&address=${encodeURIComponent(address)}`;
 
   console.log("🔍 Simulator Request URL:", upstream);
 
