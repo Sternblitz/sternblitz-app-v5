@@ -69,18 +69,21 @@ export async function GET(request) {
 
     const data = await res.json();
 
-    // Validate data structure
-    const reviews = data.reviews || {};
-    const r1 = Number(reviews["1"] || 0);
-    const r2 = Number(reviews["2"] || 0);
-    const r3 = Number(reviews["3"] || 0);
-    const r4 = Number(reviews["4"] || 0);
-    const r5 = Number(reviews["5"] || 0);
+    // The new Vercel API returns data directly with breakdown, totalReviews, averageRating
+    // Support both old format (reviews object) and new format (breakdown object)
+    const breakdown = data.breakdown || data.reviews || {};
+    const r1 = Number(breakdown["1"] || 0);
+    const r2 = Number(breakdown["2"] || 0);
+    const r3 = Number(breakdown["3"] || 0);
+    const r4 = Number(breakdown["4"] || 0);
+    const r5 = Number(breakdown["5"] || 0);
 
-    const totalReviews = r1 + r2 + r3 + r4 + r5;
-    let averageRating = 0.0;
+    // Use values from API if available, otherwise calculate
+    let totalReviews = typeof data.totalReviews === "number" ? data.totalReviews : (r1 + r2 + r3 + r4 + r5);
+    let averageRating = typeof data.averageRating === "number" ? data.averageRating : 0.0;
 
-    if (totalReviews > 0) {
+    // Fallback calculation if API didn't provide averageRating
+    if (!averageRating && totalReviews > 0) {
       const sum = (1 * r1) + (2 * r2) + (3 * r3) + (4 * r4) + (5 * r5);
       averageRating = Number((sum / totalReviews).toFixed(1));
     }
